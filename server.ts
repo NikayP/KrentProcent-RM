@@ -31,6 +31,13 @@ if (apiKey) {
   });
 }
 
+// Config status endpoint
+app.get('/api/config', (_req, res) => {
+  res.json({
+    geminiConfigured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()),
+  });
+});
+
 // Menu scanning API endpoint
 app.post('/api/scan-menu', async (req, res) => {
   try {
@@ -43,6 +50,12 @@ app.post('/api/scan-menu', async (req, res) => {
     const userSpecifiedBar = (req.body.barName || '').trim();
 
     if (!aiClient) {
+      if (imageBase64 && !textInput) {
+        return res.status(400).json({
+          error:
+            'Image scanning requires a GEMINI_API_KEY in .env. Please configure GEMINI_API_KEY or switch to the "Paste Menu Text" tab.',
+        });
+      }
       // Graceful fallback parser when GEMINI_API_KEY is not configured
       const parsedResult = parseMenuFallback(textInput || '', userSpecifiedBar);
       return res.json({
@@ -128,8 +141,18 @@ Return structured JSON only.`;
       },
     });
 
-    const rawResponse = response.text || '{}';
-    const parsed = JSON.parse(rawResponse);
+    const rawResponse = (response.text || '{}')
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    let parsed: any = { drinks: [] };
+    try {
+      parsed = JSON.parse(rawResponse);
+    } catch (parseError: any) {
+      console.error('Failed to parse AI JSON response:', rawResponse);
+      throw new Error(`AI returned non-JSON response: ${parseError.message}`);
+    }
 
     // Guarantee that if user specified a bar name, it strictly overrides any AI variation
     const finalBarName = userSpecifiedBar || parsed.detectedBarName || 'Current Bar';

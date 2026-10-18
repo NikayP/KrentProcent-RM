@@ -48,8 +48,20 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNote, setSuccessNote] = useState<string | null>(null);
   const [mode, setMode] = useState<'photo' | 'text'>('photo');
+  const [isGeminiConfigured, setIsGeminiConfigured] = useState<boolean>(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => {
+        if (cfg && typeof cfg.geminiConfigured === 'boolean') {
+          setIsGeminiConfigured(cfg.geminiConfigured);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (activeBar && activeBar !== 'all') {
@@ -98,10 +110,24 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
+
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (jsonErr: any) {
+          throw new Error(`Invalid JSON received from server: ${jsonErr.message}`);
+        }
+      } else {
+        const textResponse = await response.text();
+        throw new Error(
+          `Server returned an unexpected response (${response.status} ${response.statusText}): ${textResponse.slice(0, 150)}...`
+        );
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to scan menu.');
+        throw new Error(data?.error || `Failed to scan menu (${response.status}).`);
       }
 
       // Canonicalize targetBar with existing bars
@@ -343,6 +369,18 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       {/* Input Areas */}
       {mode === 'photo' ? (
         <div className="space-y-4">
+          {!isGeminiConfigured && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-white">Gemini API Key Required for Image Scanning</p>
+                <p className="text-stone-300">
+                  AI vision menu extraction requires <code className="text-amber-300 bg-stone-900 px-1 py-0.5 rounded">GEMINI_API_KEY</code> in your <code className="text-amber-300 bg-stone-900 px-1 py-0.5 rounded">.env</code> file. Without it, you can use the <strong>Paste Menu Text</strong> tab to parse menus locally without an API key!
+                </p>
+              </div>
+            </div>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"
