@@ -161,12 +161,12 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
         {/* Quick Highlights */}
         {highestValueBar && cheapestBar && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-stone-800">
-            <div className="bg-stone-950/70 p-3.5 rounded-xl border border-stone-800/80 flex items-center justify-between">
-              <div>
+            <div className="bg-stone-950/70 p-3.5 rounded-xl border border-stone-800/80 flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
                   🏆 Best Alcohol Value Venue
                 </span>
-                <h4 className="text-base font-black text-white">{highestValueBar.barName}</h4>
+                <h4 className="text-base font-black text-white truncate">{highestValueBar.barName}</h4>
                 <p className="text-xs text-stone-400">
                   Avg:{' '}
                   <span className="text-amber-300 font-mono font-bold">
@@ -176,19 +176,19 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
               </div>
               <button
                 onClick={() => onSelectBar(highestValueBar.barName)}
-                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center gap-1 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
               >
                 <span>View Bar</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="bg-stone-950/70 p-3.5 rounded-xl border border-stone-800/80 flex items-center justify-between">
-              <div>
+            <div className="bg-stone-950/70 p-3.5 rounded-xl border border-stone-800/80 flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
                   💰 Cheapest Standard Drink
                 </span>
-                <h4 className="text-base font-black text-white">{cheapestBar.barName}</h4>
+                <h4 className="text-base font-black text-white truncate">{cheapestBar.barName}</h4>
                 <p className="text-xs text-stone-400">
                   Avg Std Drink:{' '}
                   <span className="text-emerald-400 font-mono font-bold">
@@ -198,7 +198,7 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
               </div>
               <button
                 onClick={() => onSelectBar(cheapestBar.barName)}
-                className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs flex items-center gap-1 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
               >
                 <span>View Bar</span>
                 <ArrowRight className="w-3.5 h-3.5" />

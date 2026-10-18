@@ -257,10 +257,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleShare}
-              className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-3.5 py-2 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
             >
               {copied ? (
                 <>
@@ -281,7 +281,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       {/* Filter, Search & Sort Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-stone-900/90 p-3 rounded-2xl border border-stone-800">
         {/* Category Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Filter className="w-3.5 h-3.5 text-stone-500 mr-1 shrink-0" />
           {[
             { id: 'all', label: 'All Drinks' },

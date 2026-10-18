@@ -1,1 +1,31 @@
 @import "tailwindcss";
+
+@theme {
+  --color-stone-750: oklch(32.1% 0.0085 50.9);
+  --color-stone-850: oklch(24.2% 0.0065 45.2);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-stone-950);
+    scrollbar-color: var(--color-stone-700) var(--color-stone-950);
+  }
+
+  button:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+}

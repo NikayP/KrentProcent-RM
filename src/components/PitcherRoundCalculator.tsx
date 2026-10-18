@@ -143,7 +143,7 @@ export const PitcherRoundCalculator: React.FC<PitcherRoundCalculatorProps> = ({
           </div>
 
           {pitcherPresetsFromBar.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] text-stone-500 uppercase shrink-0">From menu:</span>
               {pitcherPresetsFromBar.map((p) => (
                 <button
@@ -234,7 +234,7 @@ export const PitcherRoundCalculator: React.FC<PitcherRoundCalculatorProps> = ({
           </div>
 
           {glassPresetsFromBar.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] text-stone-500 uppercase shrink-0">From menu:</span>
               {glassPresetsFromBar.slice(0, 4).map((g) => (
                 <button
@@ -323,7 +323,7 @@ export const PitcherRoundCalculator: React.FC<PitcherRoundCalculatorProps> = ({
             </label>
             <span className="font-mono font-black text-amber-400">{groupSize} people</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {[2, 3, 4, 5, 6, 8, 10].map((num) => (
               <button
                 key={num}
@@ -359,7 +359,7 @@ export const PitcherRoundCalculator: React.FC<PitcherRoundCalculatorProps> = ({
               {glassesPerPerson} {glassesPerPerson === 1 ? 'glass' : 'glasses'} / person
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {[1, 2, 3, 4, 5, 6].map((r) => (
               <button
                 key={r}

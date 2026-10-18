@@ -291,7 +291,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             className="flex-1 bg-stone-900 text-white font-medium text-xs sm:text-sm rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400"
           />
           {availableBars.length > 0 && (
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+            <div className="flex flex-wrap items-center gap-1.5">
               {availableBars.map((b) => (
                 <button
                   key={b}
@@ -465,7 +465,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span>Detected Drinks for {targetBar}</span>
-                <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono">
+                <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono whitespace-nowrap shrink-0">
                   {scannedDrinks.length} found
                 </span>
               </h3>

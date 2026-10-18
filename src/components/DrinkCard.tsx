@@ -122,8 +122,8 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
     >
       {/* Top Banner for Best Value */}
       {isBest && (
-        <div className="absolute -top-3 left-4 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 text-[11px] font-black uppercase px-3 py-0.5 rounded-full shadow-md flex items-center gap-1.5 tracking-wide">
-          <Trophy className="w-3.5 h-3.5" />
+        <div className="absolute -top-3 left-4 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 text-stone-950 text-[11px] font-black uppercase px-3 py-0.5 rounded-full shadow-md flex items-center gap-1.5 tracking-wide whitespace-nowrap">
+          <Trophy className="w-3.5 h-3.5 shrink-0" />
           <span>Krent Champion &bull; Best Bang for Buck</span>
         </div>
       )}
@@ -307,7 +307,7 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
                   {otherBarsCount > 0 && (
                     <span
                       title={`This exact drink size is also recorded at ${otherBarsCount} other bar(s)`}
-                      className="text-[10px] font-semibold text-stone-300 bg-stone-800/90 border border-stone-700 px-2 py-0.5 rounded-md"
+                      className="text-[10px] font-semibold text-stone-300 bg-stone-800/90 border border-stone-700 px-2 py-0.5 rounded-md whitespace-nowrap"
                     >
                       +{otherBarsCount} {otherBarsCount === 1 ? 'other bar' : 'other bars'}
                     </span>
@@ -327,7 +327,7 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
                     {formatCurrency(drink.price, currency)}
                   </span>
                   {drink.notes && (
-                    <span className="text-stone-500 italic hidden sm:inline">
+                    <span className="text-stone-400 italic">
                       &bull; {drink.notes}
                     </span>
                   )}

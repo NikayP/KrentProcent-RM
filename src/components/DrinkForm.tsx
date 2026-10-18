@@ -202,7 +202,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header & Quick Bar Presets */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 mb-4">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
@@ -214,7 +214,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
         </div>
 
         {/* 1-tap presets bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider whitespace-nowrap mr-1">
             Templates:
           </span>
@@ -244,14 +244,14 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <label
               htmlFor="bar-name-input"
-              className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5"
+              className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 shrink-0"
             >
               <Store className="w-3.5 h-3.5 text-amber-400" />
               <span>Which Bar are you sitting at? *</span>
             </label>
 
             {availableBars.length > 0 && (
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] text-stone-500 uppercase mr-1">Known Bars:</span>
                 {availableBars.map((b) => (
                   <button
@@ -288,7 +288,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
           {/* Quick-copy drinks known from other bars */}
           {otherBarSuggestions.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pt-1">
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
               <span className="text-[10px] text-stone-400 flex items-center gap-1 shrink-0">
                 <Copy className="w-3 h-3 text-amber-400" />
                 <span>From other bars (adjust price):</span>

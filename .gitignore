@@ -10,3 +10,5 @@ coverage/
 .vercel
 .aistudio/
 .backups/
+
+.backups/
