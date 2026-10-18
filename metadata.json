@@ -1,0 +1,6 @@
+{
+  "name": "KrentProcent RM",
+  "description": "Smart bar alcohol value calculator and menu comparator. Compare volume, price, and ABV to find the best bang for your buck, with instant menu screenshot scanning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
