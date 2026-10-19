@@ -20,7 +20,7 @@ import {
   calculateDrinkMetrics,
   areBarNamesEquivalent,
 } from '../utils/calculator';
-import { SAMPLE_MENU_TEXT } from '../presets/barData';
+import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
 
 interface MenuScannerProps {
   onImportDrinks: (drinks: DrinkItem[]) => void;
@@ -127,7 +127,8 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       }
 
       if (!response.ok) {
-        throw new Error(data?.error || `Failed to scan menu (${response.status}).`);
+        const details = data?.details ? ` (${data.details})` : '';
+        throw new Error(`${data?.error || `Failed to scan menu (${response.status})`}${details}`);
       }
 
       // Canonicalize targetBar with existing bars
@@ -203,6 +204,14 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     setTextInput(SAMPLE_MENU_TEXT);
     setMode('text');
     handleScan(SAMPLE_MENU_TEXT, sampleBar);
+  };
+
+  const handleLoadOperaSample = () => {
+    const operaBar = canonicalizeBarName('Café de Opera', availableBars);
+    setTargetBar(operaBar);
+    setTextInput(SAMPLE_OPERA_MENU_TEXT);
+    setMode('text');
+    handleScan(SAMPLE_OPERA_MENU_TEXT, operaBar);
   };
 
   const toggleSelect = (id: string) => {
@@ -286,16 +295,28 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
           </p>
         </div>
 
-        {/* 1-Click Sample Button */}
-        <button
-          type="button"
-          onClick={handleLoadSample}
-          disabled={isScanning}
-          className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap self-start sm:self-auto"
-        >
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>Try Sample De Bruine Kroeg Menu</span>
-        </button>
+        {/* 1-Click Sample Buttons */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleLoadOperaSample}
+            disabled={isScanning}
+            className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span>Try Sample Café de Opera Menu</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleLoadSample}
+            disabled={isScanning}
+            className="px-3 py-2 rounded-xl bg-stone-850 hover:bg-stone-800 text-stone-300 border border-stone-750 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+          >
+            <Sparkles className="w-4 h-4 text-stone-400" />
+            <span>De Bruine Kroeg</span>
+          </button>
+        </div>
       </div>
 
       {/* Target Bar Selector */}
@@ -508,9 +529,22 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
 
       {/* Messages */}
       {errorMessage && (
-        <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-start sm:items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5 sm:mt-0" />
+            <span className="leading-relaxed">{errorMessage}</span>
+          </div>
+          {imagePreview && (
+            <button
+              type="button"
+              onClick={() => handleScan()}
+              disabled={isScanning}
+              className="px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-white font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 border border-rose-700/60 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+              <span>Retry Scan</span>
+            </button>
+          )}
         </div>
       )}
 

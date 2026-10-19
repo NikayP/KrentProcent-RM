@@ -66,30 +66,32 @@ app.post('/api/scan-menu', async (req, res) => {
     }
 
     const promptText = `You are an expert drinks menu reader for a bar alcohol comparison app called "KrentProcent RM".
-Analyze the provided image or text of a bar drinks menu (primarily focused on beers, but also include wines, spirits, cocktails, and ciders).
 ${
   userSpecifiedBar
-    ? `CRITICAL INSTRUCTION: The user is currently sitting at "${userSpecifiedBar}". You MUST use "${userSpecifiedBar}" as the "barName" for ALL drinks and "detectedBarName". Do NOT alter spelling, accents, or invent a new bar name.`
-    : `Identify the Bar/Venue name if present in the header, logo, or text (e.g. "De Bruine Kroeg", "Gollem", "The Waterhole"). If not specified or detected, use "Current Bar".`
+    ? `The user is currently sitting at "${userSpecifiedBar}". You MUST use "${userSpecifiedBar}" as the barName.`
+    : `Identify the Bar/Venue name if present in the header, logo, or text (e.g. "Café de Opera", "De Bruine Kroeg", "Gollem"). If not specified or detected, use "Current Bar".`
 }
 
-Extract each distinct drink item with its:
-1. "name": Brand or drink name (e.g. "Heineken Vaasje", "Duvel", "La Chouffe", "Guinness Pint", "House Chardonnay", "Espresso Martini")
-2. "barName": The venue name ("${userSpecifiedBar || 'Current Bar'}").
-3. "category": One of "beer", "wine", "spirit", "cocktail", "cider", "other"
-4. "volumeMl": Volume in milliliters as a number.
-   - If stated in cl, multiply by 10 (e.g. 25cl = 250, 33cl = 330, 50cl = 500).
-   - If stated as pint/pintje: UK pint is ~568ml, standard pub pint or halve liter is 500ml, standard Dutch vaasje is 250ml, fluitje is 200ml.
-   - If standard beer bottle/can with unspecified volume, assume 330ml.
-   - If standard wine glass with unspecified volume, assume 150ml (bottle is 750ml).
-   - If shot/spirit with unspecified volume, assume 35ml.
-   - If cocktail with unspecified volume, assume 200ml.
-5. "abv": Alcohol by volume percentage as a number (e.g., 5.0 for 5%, 8.5 for 8.5%). If missing for a well-known drink, estimate accurately (e.g. standard pilsner 5.0%, wine 12.5%, shot 40.0%).
-6. "price": The price as a number in the local currency (e.g. 3.50, 4.20, 6.00). If multiple sizes exist, output a separate item for each size.
-7. "notes": Brief extra info like "Draft", "Bottle", "Draft 50cl", etc.
+CRITICAL VISION INSTRUCTION:
+- If the image shows a menu card inside a screen or interface, focus EXCLUSIVELY on the actual drinks menu card and ignore any website frames, buttons, or error boxes.
+- Extract every distinct alcoholic drink visible on the menu (beers, wines, spirits, cocktails, ciders).
+- For each item, capture:
+  * name: Drink or brand name (e.g. "Duvel", "Heineken Vaasje", "Westmalle Tripel", "Lagunitas IPA")
+  * category: "beer" | "wine" | "spirit" | "cocktail" | "cider" | "other"
+  * volumeMl: serving volume in ml (e.g. 200 for fluitje, 250 for vaasje, 330 for bottle, 500 for pint/halve liter, 1500 for pitcher, 150 for wine, 35 for shot)
+  * abv: percentage number (e.g. 5.0 for 5%, 8.5 for 8.5%)
+  * price: price number (e.g. 3.50, 4.80, 5.75)
+  * notes: brief style or notes (e.g. "Blond", "Wisseltap", "Trappist", "Draft")
 
-Ignore non-alcoholic drinks (soda, water, 0.0% beers, coffee, snacks) unless specifically requested.
-Return structured JSON only.`;
+Format your response as either valid JSON:
+{
+  "detectedBarName": "${userSpecifiedBar || 'Current Bar'}",
+  "drinks": [
+    { "name": "Duvel", "category": "beer", "volumeMl": 330, "abv": 8.5, "price": 4.80, "notes": "Blond" }
+  ]
+}
+OR one item per line:
+Name | Category | VolumeMl | ABV% | Price | Notes`;
 
     const contents: any[] = [];
     if (imageBase64) {
@@ -107,67 +109,80 @@ Return structured JSON only.`;
       text: promptText + (textInput ? `\n\nRaw Menu Text:\n${textInput}` : ''),
     });
 
-    const response = await aiClient.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: contents.length === 1 ? contents[0] : { parts: contents },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            detectedBarName: { type: Type.STRING },
-            drinks: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  barName: { type: Type.STRING },
-                  category: {
-                    type: Type.STRING,
-                    description: 'One of: beer, wine, spirit, cocktail, cider, other',
-                  },
-                  volumeMl: { type: Type.NUMBER },
-                  abv: { type: Type.NUMBER },
-                  price: { type: Type.NUMBER },
-                  notes: { type: Type.STRING },
-                },
-                required: ['name', 'category', 'volumeMl', 'abv', 'price'],
-              },
-            },
-          },
-          required: ['drinks'],
-        },
-      },
+    // Multi-model vision fallback chain to overcome temporary 503 high demand spikes
+    const CANDIDATE_MODELS = [
+      'gemini-3.5-flash',
+      'gemini-3.6-flash',
+      'gemini-flash-lite-latest',
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
+    ];
+
+    let extractedDrinks: any[] = [];
+    let detectedBar = userSpecifiedBar || 'Current Bar';
+    let lastError: any = null;
+    let successfulModel = '';
+
+    for (const modelName of CANDIDATE_MODELS) {
+      try {
+        console.log(`[scan-menu] Attempting analysis with model: ${modelName}`);
+        const response = await aiClient.models.generateContent({
+          model: modelName,
+          contents: contents.length === 1 ? contents[0] : { parts: contents },
+        });
+
+        const rawText = response.text || '';
+        if (rawText.trim().length > 0) {
+          const parsedResult = parseVisionResponse(rawText, userSpecifiedBar);
+          if (parsedResult.drinks && parsedResult.drinks.length > 0) {
+            extractedDrinks = parsedResult.drinks;
+            detectedBar = userSpecifiedBar || parsedResult.detectedBarName || detectedBar;
+            successfulModel = modelName;
+            console.log(
+              `[scan-menu] Success with ${modelName}! Extracted ${extractedDrinks.length} drinks.`
+            );
+            break;
+          } else {
+            console.log(`[scan-menu] Model ${modelName} returned text but 0 parsed drinks, trying next...`);
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[scan-menu] Model ${modelName} failed (${err.message?.slice(0, 100)}), falling back...`);
+        lastError = err;
+      }
+    }
+
+    if (extractedDrinks.length > 0) {
+      const finalBarName = userSpecifiedBar || detectedBar || 'Current Bar';
+      return res.json({
+        detectedBarName: finalBarName,
+        drinks: extractedDrinks.map((d: any) => ({
+          ...d,
+          barName: finalBarName,
+        })),
+        modelUsed: successfulModel,
+      });
+    }
+
+    // If AI calls failed or returned 0 drinks, and text was provided, use fallback text parser
+    if (textInput) {
+      const fallback = parseMenuFallback(textInput, userSpecifiedBar);
+      return res.json({
+        detectedBarName: fallback.detectedBarName,
+        drinks: fallback.drinks,
+        warning: 'AI parsing encountered an issue, used local text parser.',
+      });
+    }
+
+    // If no drinks found
+    return res.status(500).json({
+      error:
+        'Could not detect any alcoholic drinks from the menu image. Please ensure the menu photo is in focus or try entering text on the "Paste Menu Text" tab.',
+      details: lastError ? lastError.message : 'No drinks recognized',
     });
-
-    const rawResponse = (response.text || '{}')
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/\s*```$/i, '')
-      .trim();
-    let parsed: any = { drinks: [] };
-    try {
-      parsed = JSON.parse(rawResponse);
-    } catch (parseError: any) {
-      console.error('Failed to parse AI JSON response:', rawResponse);
-      throw new Error(`AI returned non-JSON response: ${parseError.message}`);
-    }
-
-    // Guarantee that if user specified a bar name, it strictly overrides any AI variation
-    const finalBarName = userSpecifiedBar || parsed.detectedBarName || 'Current Bar';
-    if (parsed.drinks && Array.isArray(parsed.drinks)) {
-      parsed.drinks = parsed.drinks.map((d: any) => ({
-        ...d,
-        barName: userSpecifiedBar || d.barName || finalBarName,
-      }));
-    }
-    parsed.detectedBarName = finalBarName;
-
-    return res.json(parsed);
   } catch (error: any) {
     console.error('Error scanning menu:', error);
-    // If Gemini fails, fallback to heuristic or clear error
     if (req.body.textInput) {
       const userSpecifiedBar = (req.body.barName || '').trim();
       const fallback = parseMenuFallback(req.body.textInput, userSpecifiedBar);
@@ -183,6 +198,161 @@ Return structured JSON only.`;
     });
   }
 });
+
+// Robust dual-format parser: handles JSON or line-by-line pipe/bullet output from Vision models
+function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
+  const finalBar = userSpecifiedBar || 'Current Bar';
+
+  // 1. Try JSON extraction first
+  try {
+    const jsonMatch =
+      rawText.match(/```json\s*([\s\S]*?)\s*```/i) ||
+      rawText.match(/```\s*([\s\S]*?)\s*```/i) ||
+      rawText.match(/(\{[\s\S]*\})/);
+
+    const jsonString = jsonMatch ? jsonMatch[1] : rawText;
+    const parsed = JSON.parse(jsonString);
+    const list = Array.isArray(parsed) ? parsed : parsed.drinks || parsed.items;
+
+    if (Array.isArray(list) && list.length > 0) {
+      const validDrinks = list
+        .filter((d) => d && (d.name || d.drinkName))
+        .map((d) => ({
+          name: (d.name || d.drinkName || 'Drink').trim(),
+          barName: userSpecifiedBar || d.barName || parsed.detectedBarName || finalBar,
+          category: (d.category || 'beer').toLowerCase(),
+          volumeMl: Number(d.volumeMl) || 330,
+          abv: Number(d.abv) || 5.0,
+          price: Number(d.price) || 4.5,
+          notes: d.notes || '',
+        }))
+        .filter((d) => d.price > 0 && d.volumeMl > 0);
+
+      if (validDrinks.length > 0) {
+        return {
+          detectedBarName: userSpecifiedBar || parsed.detectedBarName || finalBar,
+          drinks: validDrinks,
+        };
+      }
+    }
+  } catch (e) {
+    // Continue to line parsing
+  }
+
+  // 2. Line-by-line parsing (for pipe-delimited or list outputs)
+  const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
+  const items: any[] = [];
+
+  for (const line of lines) {
+    if (
+      line.startsWith('#') ||
+      line.startsWith('---') ||
+      line.startsWith('===') ||
+      line.toLowerCase().includes('failed to analyze') ||
+      line.toLowerCase().includes('geschiedenis van')
+    ) {
+      continue;
+    }
+
+    if (line.includes('|')) {
+      const parts = line.split('|').map((p) => p.trim());
+      if (parts.length >= 2) {
+        const name = parts[0].replace(/^[*•-]\s*/, '').replace(/[*_]/g, '').trim();
+        if (
+          !name ||
+          name.toLowerCase() === 'name' ||
+          name.toLowerCase() === 'drink name' ||
+          name.toLowerCase().includes('tapbieren wisseltaps')
+        ) {
+          continue;
+        }
+
+        let category = 'beer';
+        if (parts[1]) {
+          const c = parts[1].toLowerCase();
+          if (c.includes('wine') || c.includes('wijn')) category = 'wine';
+          else if (c.includes('cider')) category = 'cider';
+          else if (c.includes('spirit') || c.includes('shot')) category = 'spirit';
+          else if (c.includes('cocktail')) category = 'cocktail';
+        }
+
+        let volumeMl = 330;
+        let abv = 5.0;
+        let price = 0;
+        let notes = parts[parts.length - 1] || '';
+
+        for (let i = 2; i < parts.length; i++) {
+          const part = parts[i];
+          if (/ml\b/i.test(part) || (/^\d{2,4}$/.test(part) && parseInt(part, 10) >= 100)) {
+            const v = parseFloat(part.replace(/[^\d.]/g, ''));
+            if (v > 0) volumeMl = v;
+          } else if (
+            /%/.test(part) ||
+            (/^\d+(?:[.,]\d+)?$/.test(part) && parseFloat(part.replace(',', '.')) <= 25 && !price)
+          ) {
+            const a = parseFloat(part.replace(',', '.').replace(/[^\d.]/g, ''));
+            if (a > 0 && a <= 100) abv = a;
+          } else if (/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})/.test(part)) {
+            const m = part.match(/(\d+[.,]\d{1,2})/);
+            if (m) price = parseFloat(m[1].replace(',', '.'));
+          }
+        }
+
+        if (!price) {
+          const pm = line.match(/(?:€|\$|£)?\s*(\d+[.,]\d{2})\b/);
+          if (pm) price = parseFloat(pm[1].replace(',', '.'));
+        }
+
+        if (name && price > 0) {
+          items.push({
+            name,
+            barName: finalBar,
+            category,
+            volumeMl,
+            abv,
+            price,
+            notes,
+          });
+          continue;
+        }
+      }
+    }
+
+    // Heuristic line parsing
+    const priceMatch =
+      line.match(/(?:€|\$|£)?\s*(\d+[.,]\d{2})\b/) || line.match(/\(\s*(\d+[.,]\d{1,2})\s*\)/);
+    if (priceMatch) {
+      const price = parseFloat(priceMatch[1].replace(',', '.'));
+      const abvMatch = line.match(/(\d+(?:[.,]\d+)?)\s*%/);
+      const abv = abvMatch ? parseFloat(abvMatch[1].replace(',', '.')) : 5.0;
+
+      const name = line
+        .replace(/[*_#•-]/g, ' ')
+        .replace(priceMatch[0], '')
+        .replace(/\(\s*\d+(?:[.,]\d+)?\s*%\s*\)/g, '')
+        .replace(/[-–—|()]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (name && name.length >= 2 && price > 0 && price < 100) {
+        items.push({
+          name,
+          barName: finalBar,
+          category: 'beer',
+          volumeMl: 330,
+          abv,
+          price,
+          notes: 'Scanned from menu',
+        });
+      }
+    }
+  }
+
+  return {
+    detectedBarName: finalBar,
+    drinks: items,
+  };
+}
 
 // Heuristic fallback text parser when AI is unavailable or text is supplied
 function parseMenuFallback(text: string, userSpecifiedBar?: string) {

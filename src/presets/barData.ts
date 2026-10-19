@@ -179,3 +179,40 @@ Olmeca Tequila Shot 35ml (38.0%) - €4.20
 Ketel One Vodka Shot 35ml (40.0%) - €4.50
 Gin & Tonic 200ml (9.5%) - €10.50
 Apple Bandit Cider 33cl (4.5%) - €4.80`;
+
+export const SAMPLE_OPERA_MENU_TEXT = `--- CAFÉ DE OPERA (NIJMEGEN) BIERKAART ---
+Dommelsch Pilsener Vaasje 25cl (5.0%) - €3.10
+Brand IPA Wisseltap 25cl (7.0%) - €3.50
+Brand IPA Wisseltap 50cl (7.0%) - €5.50
+Piedboeuf Blond Wisseltap (5.5%) - €3.50
+Troubadour Magma Wisseltap (9.0%) - €7.20
+Oedipus Mannenliefde Saison (6.0%) - €3.70
+Kasteel Blond (7.0%) - €4.30
+Chouffe Blonde (8.0%) - €5.00
+La Chouffe (8.0%) - €5.60
+Duvel Belgian Blond (8.5%) - €4.80
+Rochefort Triple Extra Trappist (8.1%) - €5.70
+Westmalle Tripel Trappist (9.5%) - €5.00
+Rochefort 10 Trappist (11.3%) - €5.80
+Chimay Rood Trappist (7.0%) - €4.30
+Orval Trappist (6.2%) - €5.10
+Jopen Koyt (8.5%) - €5.90
+VandeStreek Play-IPA (0.5%) - €5.50
+De Leckere Gulden Leeuw (6.5%) - €6.10
+La Trappe Dubbel (7.0%) - €4.80
+Grolsch Blond Fles (5.0%) - €4.20
+Saison Dupont (6.5%) - €4.40
+Lagunitas IPA (6.2%) - €4.60
+Troubadour Westkust (8.5%) - €4.90
+Uiltje Dr. Raptor Imperial IPA (8.2%) - €5.50
+De Koninck Bolleke (5.2%) - €3.50
+Gouden Carolus Ambrio (8.0%) - €4.40
+Apple Bandit Cider (4.5%) - €4.00
+Pohjala Must Kuld Porter (7.8%) - €5.00
+Van Moll Volksvermogen Extra Stout (8.5%) - €5.00
+Moersleutel Motörhead Imperial Stout (10.0%) - €5.90
+St. Bernardus Prior 8 (8.0%) - €4.40
+St. Bernardus Abt 12 (10.0%) - €4.70
+Gouden Carolus Whisky Infused (11.7%) - €7.70
+Weihenstephaner Hefeweissbier 50cl (5.4%) - €4.20`;
+
