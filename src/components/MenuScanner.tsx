@@ -22,6 +22,57 @@ import {
 } from '../utils/calculator';
 import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
 
+/**
+ * Resizes and compresses an image client-side to keep the base64 payload
+ * well below Vercel's 4.5 MB Serverless Function payload limit (typically ~200-500 KB)
+ * while preserving high visual fidelity for Gemini Vision OCR.
+ */
+function compressImageFile(file: File, maxDimension = 1600, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read image file'));
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        // Downscale while maintaining aspect ratio if either dimension exceeds maxDimension
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          // If canvas context fails, fall back to original dataUrl
+          resolve(dataUrl);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Export as JPEG with optimal compression
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 interface MenuScannerProps {
   onImportDrinks: (drinks: DrinkItem[]) => void;
   existingDrinks?: DrinkItem[];
@@ -43,6 +94,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [textInput, setTextInput] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [isProcessingImage, setIsProcessingImage] = useState<boolean>(false);
   const [scannedDrinks, setScannedDrinks] = useState<DrinkItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -69,7 +121,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     }
   }, [activeBar]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -79,11 +131,21 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     }
 
     setErrorMessage(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsProcessingImage(true);
+
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1600, 0.82);
+      setImagePreview(compressedDataUrl);
+    } catch (err: any) {
+      console.warn('Image compression fallback to raw data URL:', err);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsProcessingImage(false);
+    }
   };
 
   const handleScan = async (overrideText?: string, overrideBarName?: string) => {
@@ -93,6 +155,17 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     if (!imagePreview && !textToSend.trim()) {
       setErrorMessage('Please upload a menu image or enter text to scan.');
       return;
+    }
+
+    // Safety check: ensure payload stays well below Vercel's 4.5 MB platform limit
+    if (imagePreview) {
+      const approxBytes = (imagePreview.length * 3) / 4;
+      if (approxBytes > 4.2 * 1024 * 1024) {
+        setErrorMessage(
+          'The image is too large for the scanning service (> 4.2 MB). Please take a closer photo or crop the image.'
+        );
+        return;
+      }
     }
 
     setIsScanning(true);
@@ -105,6 +178,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: imagePreview || undefined,
+          mimeType: 'image/jpeg',
           textInput: textToSend || undefined,
           barName: barToUse.trim() || undefined,
         }),
@@ -438,17 +512,25 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
 
           {!imagePreview ? (
             <div
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-stone-700 hover:border-amber-400/60 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-stone-950/40 hover:bg-stone-950/80 group"
+              onClick={() => !isProcessingImage && fileInputRef.current?.click()}
+              className={`border-2 border-dashed border-stone-700 hover:border-amber-400/60 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-stone-950/40 hover:bg-stone-950/80 group ${
+                isProcessingImage ? 'opacity-60 cursor-wait' : ''
+              }`}
             >
               <div className="w-14 h-14 rounded-2xl bg-stone-850 group-hover:bg-amber-500/20 text-stone-400 group-hover:text-amber-400 flex items-center justify-center mx-auto mb-3 transition-colors border border-stone-750">
-                <Upload className="w-6 h-6" />
+                {isProcessingImage ? (
+                  <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
+                ) : (
+                  <Upload className="w-6 h-6" />
+                )}
               </div>
               <h4 className="text-sm font-bold text-white mb-1">
-                Take Photo or Upload Menu Screenshot
+                {isProcessingImage ? 'Optimizing Photo...' : 'Take Photo or Upload Menu Screenshot'}
               </h4>
               <p className="text-xs text-stone-400 max-w-sm mx-auto">
-                Supports camera capture on mobile or JPG, PNG, WebP screenshots from bar apps.
+                {isProcessingImage
+                  ? 'Resizing image for fast and sharp AI scanning...'
+                  : 'Supports camera capture on mobile or JPG, PNG, WebP screenshots from bar apps.'}
               </p>
             </div>
           ) : (
@@ -475,7 +557,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             <button
               type="button"
               onClick={() => handleScan()}
-              disabled={isScanning}
+              disabled={isScanning || isProcessingImage}
               className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
             >
               {isScanning ? (
