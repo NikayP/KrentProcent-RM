@@ -195,9 +195,6 @@ export const Header: React.FC<HeaderProps> = ({
                     RM
                   </span>
                 </h1>
-                <span className="hidden sm:inline-block whitespace-nowrap text-[11px] font-medium bg-amber-500/10 text-amber-300 px-2.5 py-0.5 rounded-full border border-amber-500/20 shrink-0">
-                  Bar Value Meter
-                </span>
               </div>
               <p className="hidden xs:block text-[11px] sm:text-xs text-stone-400 font-medium truncate">
                 Most pure alcohol per coin at the bar &bull; Compare by venue &amp; menu
