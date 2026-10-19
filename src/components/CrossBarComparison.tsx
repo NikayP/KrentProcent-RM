@@ -15,7 +15,6 @@ import {
   Check,
   X,
   Beer,
-  Swords,
 } from 'lucide-react';
 
 interface CrossBarComparisonProps {
@@ -26,7 +25,6 @@ interface CrossBarComparisonProps {
   onAddBar?: (barName: string) => void;
   onRenameBar?: (oldName: string, newName: string) => void;
   onDeleteBar: (barName: string) => void;
-  onSelectForDuel?: (drinkA: DrinkItem, drinkB: DrinkItem) => void;
 }
 
 export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
@@ -37,7 +35,6 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
   onAddBar,
   onRenameBar,
   onDeleteBar,
-  onSelectForDuel,
 }) => {
   const [newBarName, setNewBarName] = useState('');
   const [editingBar, setEditingBar] = useState<string | null>(null);
@@ -463,20 +460,12 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                   </div>
                 </div>
 
-                {onSelectForDuel && group.entries.length >= 2 && (
+                {group.entries.length >= 2 && (
                   <div className="pt-2 border-t border-stone-800/80 flex items-center justify-between text-[11px]">
                     <span className="text-stone-400">
                       Best at <strong className="text-amber-300">{group.bestEntry.barName}</strong>{' '}
                       ({group.maxValueAdvantagePercent > 0 ? `+${group.maxValueAdvantagePercent}% value` : 'equal value'})
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => onSelectForDuel(group.bestEntry, group.worstEntry)}
-                      className="text-amber-300 hover:text-amber-200 font-bold flex items-center gap-1"
-                    >
-                      <Swords className="w-3.5 h-3.5" />
-                      <span>1v1 Duel Bars</span>
-                    </button>
                   </div>
                 )}
               </div>

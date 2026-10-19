@@ -6,7 +6,6 @@ import {
   calculateCostPerStandardDrink,
   calculateDrinkMetrics,
   rankDrinks,
-  compareTwoDrinks,
   getUniqueBars,
   filterDrinksByBar,
   calculateBarSummaries,
@@ -23,7 +22,6 @@ import {
   mergeDrinksBatch,
   renameBarInDrinks,
   findCrossBarCommonDrinks,
-  calculatePitcherComparison,
   sanitizeDrinkItem,
 } from './calculator.ts';
 import type { DrinkItem } from './calculator.ts';
@@ -383,27 +381,4 @@ test('findCrossBarCommonDrinks identifies identical drinks sold across multiple 
   assert.equal(common[0].bestEntry.barName, 'Bar A');
   assert.equal(common[0].worstEntry.barName, 'Bar B');
   assert.equal(common[0].maxPriceDifference, 1.0);
-});
-
-test('calculatePitcherComparison computes pitcher and group round savings accurately', () => {
-  const res = calculatePitcherComparison({
-    pitcherVolumeMl: 1500,
-    pitcherAbv: 5.0,
-    pitcherPrice: 18.0,
-    glassVolumeMl: 250,
-    glassAbv: 5.0,
-    glassPrice: 3.5,
-    groupSize: 4,
-    glassesPerPerson: 3, // 12 glasses = 3000ml = 2 pitchers
-  });
-
-  assert.equal(res.equivalentGlassesPerPitcher, 6);
-  assert.equal(res.costOfEquivalentGlasses, 21); // 6 * 3.50
-  assert.equal(res.savingsPerPitcher, 3); // 21 - 18
-  assert.equal(res.isPitcherBetter, true);
-  assert.equal(res.groupTotalGlasses, 12);
-  assert.equal(res.pitchersNeededForGroup, 2);
-  assert.equal(res.groupPitcherCost, 36);
-  assert.equal(res.groupIndividualGlassesCost, 42);
-  assert.equal(res.groupTotalSavings, 6);
 });

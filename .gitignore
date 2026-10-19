@@ -10,5 +10,4 @@ coverage/
 .vercel
 .aistudio/
 .backups/
-
-.backups/
+parked-features/

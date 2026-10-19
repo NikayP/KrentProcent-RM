@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Beer,
   Camera,
-  Swords,
-  Users,
   RefreshCw,
   Store,
   Trash2,
@@ -19,8 +17,8 @@ import {
 import { DrinkItem, filterDrinksByBar, normalizeBarKey, DEFAULT_BAR_NAME } from '../utils/calculator';
 
 interface HeaderProps {
-  activeTab: 'calculator' | 'scanner' | 'duel' | 'group' | 'bars';
-  setActiveTab: (tab: 'calculator' | 'scanner' | 'duel' | 'group' | 'bars') => void;
+  activeTab: 'calculator' | 'scanner' | 'bars';
+  setActiveTab: (tab: 'calculator' | 'scanner' | 'bars') => void;
   currency: string;
   setCurrency: (c: string) => void;
   drinkCount: number;
@@ -283,31 +281,6 @@ export const Header: React.FC<HeaderProps> = ({
                   AI
                 </span>
               </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('duel')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeTab === 'duel'
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
-              }`}
-            >
-              <Swords className="w-4 h-4 shrink-0" />
-              <span>1v1 Duel</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('group')}
-              aria-label="Pitcher Saver Tab"
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeTab === 'group'
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
-              }`}
-            >
-              <Users className="w-4 h-4 shrink-0" />
-              <span>Pitcher Saver</span>
             </button>
           </nav>
         </div>

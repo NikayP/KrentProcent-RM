@@ -29,8 +29,6 @@ interface LeaderboardProps {
   onDeleteDrink: (id: string) => void;
   onUpdateDrink?: (drink: DrinkItem) => void;
   onLoadPresets: () => void;
-  onSelectForDuel: (drink: CalculatedDrink) => void;
-  duelSelection: CalculatedDrink[];
   activeBar: string;
   onSelectBar: (bar: string) => void;
   onDeleteBar: (bar: string) => void;
@@ -45,8 +43,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   onDeleteDrink,
   onUpdateDrink,
   onLoadPresets,
-  onSelectForDuel,
-  duelSelection,
   activeBar,
   onSelectBar,
   onDeleteBar,
@@ -364,10 +360,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                 currency={currency}
                 onDelete={onDeleteDrink}
                 onUpdate={onUpdateDrink}
-                onSelectForDuel={onSelectForDuel}
                 onSelectBar={onSelectBar}
                 availableBars={availableBars}
-                isDuelSelected={duelSelection.some((d) => d.id === drink.id)}
                 bestScore={bestOverall?.pureAlcoholPerCurrency || 0}
                 otherBarsCount={otherBarsCount}
               />

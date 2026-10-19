@@ -13,7 +13,6 @@ import {
   Apple,
   HelpCircle,
   Trash2,
-  Swords,
   Trophy,
   Pencil,
   Check,
@@ -25,10 +24,8 @@ interface DrinkCardProps {
   currency: string;
   onDelete: (id: string) => void;
   onUpdate?: (updated: DrinkItem) => void;
-  onSelectForDuel?: (drink: CalculatedDrink) => void;
   onSelectBar?: (barName: string) => void;
   availableBars?: string[];
-  isDuelSelected?: boolean;
   bestScore: number;
   otherBarsCount?: number;
 }
@@ -38,10 +35,8 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
   currency,
   onDelete,
   onUpdate,
-  onSelectForDuel,
   onSelectBar,
   availableBars = [],
-  isDuelSelected,
   bestScore,
   otherBarsCount = 0,
 }) => {
@@ -366,22 +361,6 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
                     aria-label={`Edit ${drink.name}`}
                   >
                     <Pencil className="w-4 h-4" />
-                  </button>
-                )}
-
-                {onSelectForDuel && (
-                  <button
-                    type="button"
-                    onClick={() => onSelectForDuel(drink)}
-                    title="Compare in 1v1 Duel"
-                    className={`p-2 rounded-xl transition-all border ${
-                      isDuelSelected
-                        ? 'bg-amber-500 text-stone-950 border-amber-400'
-                        : 'bg-stone-800 hover:bg-stone-750 text-stone-300 border-stone-700/60'
-                    }`}
-                    aria-label={`Compare ${drink.name} in duel`}
-                  >
-                    <Swords className="w-4 h-4" />
                   </button>
                 )}
 

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   DrinkItem,
-  CalculatedDrink,
   getUniqueBars,
   deleteDrinksForBar,
   canonicalizeBarName,
@@ -11,15 +10,12 @@ import {
   upsertDrinkInBar,
   mergeDrinksBatch,
   renameBarInDrinks,
-  calculateDrinkMetrics,
 } from './utils/calculator';
 import { POPULAR_BAR_PRESETS } from './presets/barData';
 import { Header } from './components/Header';
 import { DrinkForm } from './components/DrinkForm';
 import { Leaderboard } from './components/Leaderboard';
-import { HeadToHeadDuel } from './components/HeadToHeadDuel';
 import { MenuScanner } from './components/MenuScanner';
-import { PitcherRoundCalculator } from './components/PitcherRoundCalculator';
 import { CrossBarComparison } from './components/CrossBarComparison';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ShieldCheck, Info, Check, Sparkles } from 'lucide-react';
@@ -80,10 +76,9 @@ export default function App() {
     return availableBars[0] || 'Café De Dokter';
   });
 
-  const [activeTab, setActiveTab] = useState<'calculator' | 'scanner' | 'duel' | 'group' | 'bars'>(
+  const [activeTab, setActiveTab] = useState<'calculator' | 'scanner' | 'bars'>(
     'calculator'
   );
-  const [duelContenders, setDuelContenders] = useState<CalculatedDrink[]>([]);
 
   // In-app confirmation dialog state
   const [barPendingDelete, setBarPendingDelete] = useState<string | null>(null);
@@ -175,7 +170,6 @@ export default function App() {
 
   const handleDeleteDrink = (id: string) => {
     setDrinks((prev) => prev.filter((d) => d.id !== id));
-    setDuelContenders((prev) => prev.filter((d) => d.id !== id));
   };
 
   const handleImportDrinks = (newDrinks: DrinkItem[]) => {
@@ -254,29 +248,9 @@ export default function App() {
   const confirmResetAll = () => {
     setDrinks([]);
     setManagedBars([]);
-    setDuelContenders([]);
     setActiveBar('all');
     setResetPending(false);
     showToast('Cleared all drinks and bars from the board.');
-  };
-
-  const handleSelectForDuel = (drink: CalculatedDrink) => {
-    setDuelContenders((prev) => {
-      const exists = prev.find((d) => d.id === drink.id);
-      if (exists) {
-        return prev.filter((d) => d.id !== drink.id);
-      }
-      if (prev.length >= 2) {
-        return [prev[1], drink];
-      }
-      return [...prev, drink];
-    });
-    setActiveTab('duel');
-  };
-
-  const handleSelectPairForDuel = (drinkA: DrinkItem, drinkB: DrinkItem) => {
-    setDuelContenders([calculateDrinkMetrics(drinkA), calculateDrinkMetrics(drinkB)]);
-    setActiveTab('duel');
   };
 
   const handleDeleteBar = (barNameToDelete: string) => {
@@ -290,9 +264,6 @@ export default function App() {
 
     setDrinks((prev) => deleteDrinksForBar(prev, barNameToDelete));
     setManagedBars((prev) => prev.filter((b) => !areBarNamesEquivalent(b, barNameToDelete)));
-    setDuelContenders((prev) =>
-      prev.filter((d) => !areBarNamesEquivalent(d.barName || '', barNameToDelete))
-    );
 
     if (activeBar !== 'all' && areBarNamesEquivalent(activeBar, barNameToDelete)) {
       setActiveBar('all');
@@ -360,8 +331,6 @@ export default function App() {
               onDeleteDrink={handleDeleteDrink}
               onUpdateDrink={handleUpdateDrink}
               onLoadPresets={handleLoadPresets}
-              onSelectForDuel={handleSelectForDuel}
-              duelSelection={duelContenders}
               activeBar={activeBar}
               onSelectBar={setActiveBar}
               onDeleteBar={handleDeleteBar}
@@ -380,7 +349,6 @@ export default function App() {
             onAddBar={handleAddBar}
             onRenameBar={handleRenameBar}
             onDeleteBar={handleDeleteBar}
-            onSelectForDuel={handleSelectPairForDuel}
           />
         )}
 
@@ -392,25 +360,6 @@ export default function App() {
             currency={currency}
             activeBar={activeBar}
             availableBars={availableBars}
-          />
-        )}
-
-        {/* TAB 4: 1v1 Duel Battle */}
-        {activeTab === 'duel' && (
-          <HeadToHeadDuel
-            drinks={drinks}
-            currency={currency}
-            initialSelection={duelContenders}
-          />
-        )}
-
-        {/* TAB 5: Pitcher Group Saver */}
-        {activeTab === 'group' && (
-          <PitcherRoundCalculator
-            currency={currency}
-            drinks={drinks}
-            activeBar={activeBar}
-            onAddDrink={(d) => handleAddDrink(d, 'update_existing')}
           />
         )}
       </main>
