@@ -253,7 +253,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
             {availableBars.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] text-stone-500 uppercase mr-1">Known Bars:</span>
-                {availableBars.map((b) => (
+                {availableBars.slice(0, 4).map((b) => (
                   <button
                     key={b}
                     type="button"
@@ -270,6 +270,26 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                     {b}
                   </button>
                 ))}
+                {availableBars.length > 4 && (
+                  <select
+                    value={availableBars.some((b) => areBarNamesEquivalent(barName, b)) ? resolvedBarName : ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setBarName(e.target.value);
+                        onSelectBar(e.target.value);
+                      }
+                    }}
+                    aria-label="All known bars"
+                    className="text-[10px] px-2 py-0.5 rounded bg-stone-900 text-amber-300 border border-stone-700 font-semibold focus:outline-none focus:border-amber-400"
+                  >
+                    <option value="">+{availableBars.length - 4} more bars...</option>
+                    {availableBars.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             )}
           </div>
@@ -277,6 +297,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           <div className="flex items-center gap-2">
             <input
               id="bar-name-input"
+              list="known-bars-datalist"
               type="text"
               value={barName}
               onChange={(e) => setBarName(e.target.value)}
@@ -284,6 +305,11 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               required
               className="w-full bg-stone-900 text-white font-medium text-xs sm:text-sm rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400 placeholder:text-stone-600"
             />
+            <datalist id="known-bars-datalist">
+              {availableBars.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
           </div>
 
           {/* Quick-copy drinks known from other bars */}

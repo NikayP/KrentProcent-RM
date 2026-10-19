@@ -310,15 +310,21 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             id="scanner-bar-input"
+            list="scanner-bars-datalist"
             type="text"
             value={targetBar}
             onChange={(e) => handleTargetBarChange(e.target.value)}
             placeholder="e.g. De Bruine Kroeg, Café Gollem, The Waterhole..."
             className="flex-1 bg-stone-900 text-white font-medium text-xs sm:text-sm rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400"
           />
+          <datalist id="scanner-bars-datalist">
+            {availableBars.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
           {availableBars.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
-              {availableBars.map((b) => (
+              {availableBars.slice(0, 4).map((b) => (
                 <button
                   key={b}
                   type="button"
@@ -332,6 +338,25 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                   {b}
                 </button>
               ))}
+              {availableBars.length > 4 && (
+                <select
+                  value={
+                    availableBars.find((b) => areBarNamesEquivalent(targetBar, b)) || ''
+                  }
+                  onChange={(e) => {
+                    if (e.target.value) handleTargetBarChange(e.target.value);
+                  }}
+                  aria-label="Select known bar"
+                  className="text-[11px] px-2.5 py-1.5 rounded-lg bg-stone-900 text-amber-300 border border-stone-700 font-semibold focus:outline-none focus:border-amber-400"
+                >
+                  <option value="">+{availableBars.length - 4} more...</option>
+                  {availableBars.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
         </div>
