@@ -197,12 +197,12 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
   ];
 
   return (
-    <div id="tour-drink-form" className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
       {/* Background ambient glow */}
       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header & Quick Bar Presets */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 mb-4">
+      <div id="tour-drink-presets" className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 mb-4">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />

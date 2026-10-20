@@ -153,9 +153,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   }
 
   return (
-    <div id="tour-leaderboard" className="space-y-4">
+    <div className="space-y-4">
       {/* Active Bar Context Banner */}
-      <div className="bg-stone-900/95 border border-stone-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+      <div id="tour-leaderboard-banner" className="bg-stone-900/95 border border-stone-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
             <Store className="w-5 h-5" />
