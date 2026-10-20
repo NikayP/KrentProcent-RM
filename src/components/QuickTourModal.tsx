@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Compass,
-  MapPin,
   Beer,
   Sparkles,
-  BarChart3,
+  Trophy,
   X,
   ChevronRight,
   ChevronLeft,
@@ -35,43 +34,33 @@ const TOUR_STEPS: TourStep[] = [
     icon: Coins,
     description:
       'Drinks have gotten expensive. KrentProcent calculates the pure alcohol efficiency for every option on the menu, so you get the most fun and value for your money.',
-    actionTip: 'Take this short 4-step tour to see how to find the top deals in seconds.',
-    tabTarget: 'calculator',
-  },
-  {
-    targetId: 'tour-sitting-at',
-    title: '1. Select or create your venue.',
-    badge: 'Step 1 of 4',
-    icon: MapPin,
-    description:
-      'Choose where you are having a drink. The app isolates drinks, rankings, and calculations exclusively to your chosen bar.',
-    actionTip: 'Click "Sitting At: ... ▾" to search existing pubs or type any name to create a new bar.',
+    actionTip: 'Take this short 3-step tour to see how to find the top deals in seconds.',
     tabTarget: 'calculator',
   },
   {
     targetId: 'tour-drink-presets',
-    title: '2. Add drinks to calculate their value.',
-    badge: 'Step 2 of 4',
+    title: '1. Add drinks manually.',
+    badge: 'Step 1 of 3',
     icon: Beer,
     description:
-      'Add drinks in seconds using quick templates like a pint, vaasje, or tripel. Just adjust the price to see its exact score.',
+      'Add drinks in seconds using quick templates like a pint, vaasje, or tripel. Just adjust the price to see its instant score.',
     actionTip: 'The score shows how many millilitres of pure alcohol you get per euro or coin spent.',
     tabTarget: 'calculator',
   },
   {
-    targetId: 'tour-leaderboard-banner',
-    title: '3. Check the real-time leaderboard.',
-    badge: 'Step 3 of 4',
-    icon: BarChart3,
+    targetId: 'tour-krent-champion',
+    title: '2. Spot the Krent Champion.',
+    badge: 'Step 2 of 3',
+    icon: Trophy,
     description:
-      'See at a glance which drink gives you the best deal at this bar, and how much you save compared to other choices.',
+      'The leaderboard crowns the #1 Krent Champion, showing you the absolute best deal at this bar and how much you save compared to other choices.',
     actionTip: 'Filter by beer or wine, or sort by value, lowest price, or alcohol percentage.',
     tabTarget: 'calculator',
   },
   {
     targetId: 'tour-scanner-sample',
-    title: '4. Scan a menu with AI.',
-    badge: 'Step 4 of 4',
+    title: '3. Scan a menu with AI.',
+    badge: 'Step 3 of 3',
     icon: Sparkles,
     description:
       'If you do not want to type everything manually, snap a photo of the pub menu or chalkboard. The AI extracts the drinks and prices for you.',
@@ -113,7 +102,13 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
     }
 
     const updateRect = () => {
-      const el = document.getElementById(step.targetId!);
+      // Find element or fallback to leaderboard container
+      const el =
+        document.getElementById(step.targetId!) ||
+        (step.targetId === 'tour-krent-champion'
+          ? document.getElementById('tour-leaderboard-banner')
+          : null);
+
       if (!el) {
         setTargetRect(null);
         return;
@@ -139,7 +134,11 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
 
     const timer1 = setTimeout(updateRect, 100);
     const timer2 = setTimeout(() => {
-      const el = document.getElementById(step.targetId!);
+      const el =
+        document.getElementById(step.targetId!) ||
+        (step.targetId === 'tour-krent-champion'
+          ? document.getElementById('tour-leaderboard-banner')
+          : null);
       if (el) setTargetRect(el.getBoundingClientRect());
     }, 320);
 

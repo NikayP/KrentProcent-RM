@@ -107,6 +107,7 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
 
   return (
     <div
+      id={isBest ? 'tour-krent-champion' : undefined}
       className={`relative rounded-2xl p-4 transition-all duration-200 border ${
         isBest
           ? 'bg-gradient-to-b from-stone-900 to-amber-950/20 border-amber-400/80 shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/30'
