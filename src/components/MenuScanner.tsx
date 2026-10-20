@@ -27,7 +27,18 @@ import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
  * well below Vercel's 4.5 MB Serverless Function payload limit (typically ~200-500 KB)
  * while preserving high visual fidelity for Gemini Vision OCR.
  */
-function compressImageFile(file: File, maxDimension = 1600, quality = 0.82): Promise<string> {
+// In-memory cache keyed by image/text fingerprint for 0ms repeat scans
+const scanResultCache = new Map<string, { detectedBarName?: string; drinks: any[] }>();
+
+function computeScanCacheKey(imageBase64?: string | null, textInput?: string): string {
+  const imgPart = imageBase64
+    ? `${imageBase64.length}:${imageBase64.slice(0, 64)}:${imageBase64.slice(-64)}`
+    : '';
+  const txtPart = (textInput || '').trim();
+  return `${imgPart}||${txtPart}`;
+}
+
+function compressImageFile(file: File, maxDimension = 1150, quality = 0.8): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Failed to read image file'));
@@ -134,7 +145,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     setIsProcessingImage(true);
 
     try {
-      const compressedDataUrl = await compressImageFile(file, 1600, 0.82);
+      const compressedDataUrl = await compressImageFile(file, 1150, 0.8);
       setImagePreview(compressedDataUrl);
     } catch (err: any) {
       console.warn('Image compression fallback to raw data URL:', err);
@@ -171,39 +182,53 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     setIsScanning(true);
     setErrorMessage(null);
     setSuccessNote(null);
+    const clientStartTime = performance.now();
 
     try {
-      const response = await fetch('/api/scan-menu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: imagePreview || undefined,
-          mimeType: 'image/jpeg',
-          textInput: textToSend || undefined,
-          barName: barToUse.trim() || undefined,
-        }),
-      });
-
-      const contentType = response.headers.get('content-type') || '';
+      const cacheKey = computeScanCacheKey(imagePreview, textToSend);
+      const cached = scanResultCache.get(cacheKey);
       let data: any = null;
 
-      if (contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonErr: any) {
-          throw new Error(`Invalid JSON received from server: ${jsonErr.message}`);
-        }
+      if (cached) {
+        data = cached;
       } else {
-        const textResponse = await response.text();
-        throw new Error(
-          `Server returned an unexpected response (${response.status} ${response.statusText}): ${textResponse.slice(0, 150)}...`
-        );
+        const response = await fetch('/api/scan-menu', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: imagePreview || undefined,
+            mimeType: 'image/jpeg',
+            textInput: textToSend || undefined,
+            barName: barToUse.trim() || undefined,
+          }),
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+
+        if (contentType.includes('application/json')) {
+          try {
+            data = await response.json();
+          } catch (jsonErr: any) {
+            throw new Error(`Invalid JSON received from server: ${jsonErr.message}`);
+          }
+        } else {
+          const textResponse = await response.text();
+          throw new Error(
+            `Server returned an unexpected response (${response.status} ${response.statusText}): ${textResponse.slice(0, 150)}...`
+          );
+        }
+
+        if (!response.ok) {
+          const details = data?.details ? ` (${data.details})` : '';
+          throw new Error(`${data?.error || `Failed to scan menu (${response.status})`}${details}`);
+        }
+
+        if (data?.drinks && Array.isArray(data.drinks) && data.drinks.length > 0) {
+          scanResultCache.set(cacheKey, data);
+        }
       }
 
-      if (!response.ok) {
-        const details = data?.details ? ` (${data.details})` : '';
-        throw new Error(`${data?.error || `Failed to scan menu (${response.status})`}${details}`);
-      }
+      const elapsedSec = ((performance.now() - clientStartTime) / 1000).toFixed(1);
 
       // Canonicalize targetBar with existing bars
       const canonicalTarget = canonicalizeBarName(
@@ -247,6 +272,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         setSelectedIds(defaultSelected);
 
         const extraNotes: string[] = [];
+        extraNotes.push(cached ? 'instant from cache' : `in ${elapsedSec}s`);
         if (duplicatesRemoved > 0) {
           extraNotes.push(`${duplicatesRemoved} duplicate line(s) merged`);
         }
@@ -255,9 +281,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         }
 
         setSuccessNote(
-          `Detected ${formatted.length} drinks for "${canonicalTarget}"${
-            extraNotes.length > 0 ? ` (${extraNotes.join(', ')})` : ''
-          }! Review and import below.`
+          `Detected ${formatted.length} drinks for "${canonicalTarget}" (${extraNotes.join(', ')})! Review and import below.`
         );
       } else {
         setErrorMessage(

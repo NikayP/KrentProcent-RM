@@ -48,6 +48,20 @@ app.post('/api/scan-menu', async (req, res) => {
     }
 
     const userSpecifiedBar = (req.body.barName || '').trim();
+    const scanStartTime = Date.now();
+
+    // Fast path: if only textInput is provided (no image), parse locally in <2ms!
+    if (!imageBase64 && textInput) {
+      const fastLocal = parseMenuFallback(textInput, userSpecifiedBar);
+      if (fastLocal.drinks && fastLocal.drinks.length > 0) {
+        return res.json({
+          detectedBarName: fastLocal.detectedBarName,
+          drinks: fastLocal.drinks,
+          durationMs: Date.now() - scanStartTime,
+          modelUsed: 'local-instant-parser',
+        });
+      }
+    }
 
     if (!aiClient) {
       if (imageBase64 && !textInput) {
@@ -65,33 +79,19 @@ app.post('/api/scan-menu', async (req, res) => {
       });
     }
 
-    const promptText = `You are an expert drinks menu reader for a bar alcohol comparison app called "KrentProcent RM".
+    // Ultra-compact prompt: eliminates ~80% of output tokens and JSON formatting overhead
+    const promptText = `Extract all alcoholic drinks from this menu. Ignore UI frames/buttons.
 ${
   userSpecifiedBar
-    ? `The user is currently sitting at "${userSpecifiedBar}". You MUST use "${userSpecifiedBar}" as the barName.`
-    : `Identify the Bar/Venue name if present in the header, logo, or text (e.g. "Café de Opera", "De Bruine Kroeg", "Gollem"). If not specified or detected, use "Current Bar".`
-}
-
-CRITICAL VISION INSTRUCTION:
-- If the image shows a menu card inside a screen or interface, focus EXCLUSIVELY on the actual drinks menu card and ignore any website frames, buttons, or error boxes.
-- Extract every distinct alcoholic drink visible on the menu (beers, wines, spirits, cocktails, ciders).
-- For each item, capture:
-  * name: Drink or brand name (e.g. "Duvel", "Heineken Vaasje", "Westmalle Tripel", "Lagunitas IPA")
-  * category: "beer" | "wine" | "spirit" | "cocktail" | "cider" | "other"
-  * volumeMl: serving volume in ml (e.g. 200 for fluitje, 250 for vaasje, 330 for bottle, 500 for pint/halve liter, 1500 for pitcher, 150 for wine, 35 for shot)
-  * abv: percentage number (e.g. 5.0 for 5%, 8.5 for 8.5%)
-  * price: price number (e.g. 3.50, 4.80, 5.75)
-  * notes: brief style or notes (e.g. "Blond", "Wisseltap", "Trappist", "Draft")
-
-Format your response as either valid JSON:
-{
-  "detectedBarName": "${userSpecifiedBar || 'Current Bar'}",
-  "drinks": [
-    { "name": "Duvel", "category": "beer", "volumeMl": 330, "abv": 8.5, "price": 4.80, "notes": "Blond" }
-  ]
-}
-OR one item per line:
-Name | Category | VolumeMl | ABV% | Price | Notes`;
+    ? ''
+    : 'First line if venue name is visible: BAR|Venue Name\n'
+}Output ONLY pipe-separated lines (NO JSON, NO markdown, NO headers, NO extra text):
+Name|Cat|VolumeMl|ABV|Price
+Cat codes: b=beer, w=wine, s=spirit, c=cocktail, ci=cider, o=other
+Defaults if not printed: vaasje=250, fluitje=200, bottle/speciaalbier=330, weizen/pint=500, wine=150, shot=35, pilsabv=5.0.
+Example:
+Brand Pilsener|b|250|5.0|3.60
+Duvel|b|330|8.5|4.80`;
 
     const contents: any[] = [];
     if (imageBase64) {
@@ -106,10 +106,10 @@ Name | Category | VolumeMl | ABV% | Price | Notes`;
     }
 
     contents.push({
-      text: promptText + (textInput ? `\n\nRaw Menu Text:\n${textInput}` : ''),
+      text: promptText + (textInput ? `\n\nMenu:\n${textInput}` : ''),
     });
 
-    // Multi-model vision fallback chain to overcome temporary 503 high demand spikes
+    // Prioritized fast vision models with thinking disabled (0ms reasoning overhead)
     const CANDIDATE_MODELS = [
       'gemini-3.5-flash',
       'gemini-3.6-flash',
@@ -126,10 +126,20 @@ Name | Category | VolumeMl | ABV% | Price | Notes`;
 
     for (const modelName of CANDIDATE_MODELS) {
       try {
-        console.log(`[scan-menu] Attempting analysis with model: ${modelName}`);
+        const modelStart = Date.now();
+        console.log(`[scan-menu] Attempting fast analysis with model: ${modelName}`);
+        const isLiteModel = modelName.includes('lite');
         const response = await aiClient.models.generateContent({
           model: modelName,
           contents: contents.length === 1 ? contents[0] : { parts: contents },
+          config: isLiteModel
+            ? { temperature: 0 }
+            : {
+                temperature: 0,
+                thinkingConfig: {
+                  thinkingBudget: 0,
+                },
+              },
         });
 
         const rawText = response.text || '';
@@ -140,7 +150,7 @@ Name | Category | VolumeMl | ABV% | Price | Notes`;
             detectedBar = userSpecifiedBar || parsedResult.detectedBarName || detectedBar;
             successfulModel = modelName;
             console.log(
-              `[scan-menu] Success with ${modelName}! Extracted ${extractedDrinks.length} drinks.`
+              `[scan-menu] Success with ${modelName} in ${Date.now() - modelStart}ms! Extracted ${extractedDrinks.length} drinks.`
             );
             break;
           } else {
@@ -162,6 +172,7 @@ Name | Category | VolumeMl | ABV% | Price | Notes`;
           barName: finalBarName,
         })),
         modelUsed: successfulModel,
+        durationMs: Date.now() - scanStartTime,
       });
     }
 
@@ -239,15 +250,17 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
     // Continue to line parsing
   }
 
-  // 2. Line-by-line parsing (for pipe-delimited or list outputs)
+  // 2. Line-by-line parsing (for compact pipe-delimited or list outputs)
   const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
   const items: any[] = [];
+  let detectedBarFromHeader = finalBar;
 
   for (const line of lines) {
     if (
       line.startsWith('#') ||
       line.startsWith('---') ||
       line.startsWith('===') ||
+      line.startsWith('```') ||
       line.toLowerCase().includes('failed to analyze') ||
       line.toLowerCase().includes('geschiedenis van')
     ) {
@@ -257,7 +270,17 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
     if (line.includes('|')) {
       const parts = line.split('|').map((p) => p.trim());
       if (parts.length >= 2) {
-        const name = parts[0].replace(/^[*•-]\s*/, '').replace(/[*_]/g, '').trim();
+        const rawFirst = parts[0].replace(/^[*•-]\s*/, '').replace(/[*_]/g, '').trim();
+
+        // Check for optional BAR|Venue Name header line
+        if (rawFirst.toUpperCase() === 'BAR' && parts[1]) {
+          if (!userSpecifiedBar) {
+            detectedBarFromHeader = parts[1].trim() || finalBar;
+          }
+          continue;
+        }
+
+        const name = rawFirst;
         if (
           !name ||
           name.toLowerCase() === 'name' ||
@@ -269,44 +292,64 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
 
         let category = 'beer';
         if (parts[1]) {
-          const c = parts[1].toLowerCase();
-          if (c.includes('wine') || c.includes('wijn')) category = 'wine';
-          else if (c.includes('cider')) category = 'cider';
-          else if (c.includes('spirit') || c.includes('shot')) category = 'spirit';
-          else if (c.includes('cocktail')) category = 'cocktail';
+          const c = parts[1].toLowerCase().trim();
+          if (c === 'w' || c.includes('wine') || c.includes('wijn')) category = 'wine';
+          else if (c === 'ci' || c.includes('cider')) category = 'cider';
+          else if (c === 's' || c.includes('spirit') || c.includes('shot') || c.includes('sterk')) category = 'spirit';
+          else if (c === 'c' || c.includes('cocktail')) category = 'cocktail';
+          else if (c === 'o' || c.includes('other')) category = 'other';
+          else category = 'beer';
         }
 
         let volumeMl = 330;
         let abv = 5.0;
         let price = 0;
-        let notes = parts[parts.length - 1] || '';
+        let notes = '';
 
-        for (let i = 2; i < parts.length; i++) {
-          const part = parts[i];
-          if (/ml\b/i.test(part) || (/^\d{2,4}$/.test(part) && parseInt(part, 10) >= 100)) {
-            const v = parseFloat(part.replace(/[^\d.]/g, ''));
-            if (v > 0) volumeMl = v;
-          } else if (
-            /%/.test(part) ||
-            (/^\d+(?:[.,]\d+)?$/.test(part) && parseFloat(part.replace(',', '.')) <= 25 && !price)
-          ) {
-            const a = parseFloat(part.replace(',', '.').replace(/[^\d.]/g, ''));
-            if (a > 0 && a <= 100) abv = a;
-          } else if (/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})/.test(part)) {
-            const m = part.match(/(\d+[.,]\d{1,2})/);
-            if (m) price = parseFloat(m[1].replace(',', '.'));
+        // Fast positional parsing for compact format: Name|Cat|VolumeMl|ABV|Price(|Notes)
+        if (parts.length >= 5) {
+          const vRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(vRaw) && vRaw > 0) {
+            volumeMl = /\bcl\b/i.test(parts[2]) && vRaw < 100 ? Math.round(vRaw * 10) : Math.round(vRaw);
+          }
+          const aRaw = parseFloat(parts[3].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(aRaw) && aRaw > 0 && aRaw <= 100) {
+            abv = aRaw;
+          }
+          const pRaw = parseFloat(parts[4].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(pRaw) && pRaw > 0) {
+            price = pRaw;
+          }
+          if (parts[5]) {
+            notes = parts[5].trim();
+          }
+        } else {
+          // Fallback column scanning when fewer than 5 columns
+          notes = parts.length > 5 ? parts[parts.length - 1] : '';
+          for (let i = 2; i < parts.length; i++) {
+            const part = parts[i];
+            if (/ml\b/i.test(part) || (/^\d{2,4}$/.test(part) && parseInt(part, 10) >= 100)) {
+              const v = parseFloat(part.replace(/[^\d.]/g, ''));
+              if (v > 0) volumeMl = v;
+            } else if (/%/.test(part)) {
+              const a = parseFloat(part.replace(',', '.').replace(/[^\d.]/g, ''));
+              if (a > 0 && a <= 100) abv = a;
+            } else if (/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})/.test(part)) {
+              const m = part.match(/(\d+[.,]\d{1,2})/);
+              if (m) price = parseFloat(m[1].replace(',', '.'));
+            }
           }
         }
 
         if (!price) {
-          const pm = line.match(/(?:€|\$|£)?\s*(\d+[.,]\d{2})\b/);
+          const pm = line.match(/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})\s*$/);
           if (pm) price = parseFloat(pm[1].replace(',', '.'));
         }
 
         if (name && price > 0) {
           items.push({
             name,
-            barName: finalBar,
+            barName: detectedBarFromHeader,
             category,
             volumeMl,
             abv,
@@ -337,19 +380,19 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
       if (name && name.length >= 2 && price > 0 && price < 100) {
         items.push({
           name,
-          barName: finalBar,
+          barName: detectedBarFromHeader,
           category: 'beer',
           volumeMl: 330,
           abv,
           price,
-          notes: 'Scanned from menu',
+          notes: '',
         });
       }
     }
   }
 
   return {
-    detectedBarName: finalBar,
+    detectedBarName: detectedBarFromHeader,
     drinks: items,
   };
 }
