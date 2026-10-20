@@ -23,7 +23,6 @@ import { ShieldCheck, Info, Check, Sparkles } from 'lucide-react';
 
 const STORAGE_KEY = 'krentprocent_rm_drinks_v2';
 const MANAGED_BARS_KEY = 'krentprocent_rm_bars_v2';
-const CURRENCY_KEY = 'krentprocent_rm_currency_v2';
 const ACTIVE_BAR_KEY = 'krentprocent_rm_active_bar_v2';
 const TOUR_STORAGE_KEY = 'krentprocent_has_seen_tour_v1';
 
@@ -59,9 +58,7 @@ export default function App() {
     return [];
   });
 
-  const [currency, setCurrency] = useState<string>(() => {
-    return localStorage.getItem(CURRENCY_KEY) || '€';
-  });
+  const currency = '€';
 
   // Calculate unique list of bars (strictly deduplicated and accent-insensitive)
   const availableBars = useMemo(
@@ -147,14 +144,6 @@ export default function App() {
       console.error('Failed to persist managed bars', e);
     }
   }, [managedBars]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(CURRENCY_KEY, currency);
-    } catch (e) {
-      console.error('Failed to persist currency', e);
-    }
-  }, [currency]);
 
   useEffect(() => {
     try {
@@ -331,8 +320,6 @@ export default function App() {
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        currency={currency}
-        setCurrency={setCurrency}
         drinkCount={drinks.length}
         drinks={drinks}
         onReset={handleResetAll}

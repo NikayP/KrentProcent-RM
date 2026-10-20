@@ -19,8 +19,6 @@ import { DrinkItem, filterDrinksByBar, normalizeBarKey, DEFAULT_BAR_NAME } from 
 interface HeaderProps {
   activeTab: 'calculator' | 'scanner' | 'bars';
   setActiveTab: (tab: 'calculator' | 'scanner' | 'bars') => void;
-  currency: string;
-  setCurrency: (c: string) => void;
   drinkCount: number;
   drinks: DrinkItem[];
   onReset: () => void;
@@ -35,8 +33,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
-  currency,
-  setCurrency,
   drinkCount,
   drinks,
   onReset,
@@ -204,19 +200,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Controls */}
           <div className="flex items-center gap-2 shrink-0">
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="bg-stone-800 hover:bg-stone-750 text-amber-300 font-bold text-xs rounded-lg px-2.5 py-1.5 sm:py-2 border border-stone-700 focus:outline-none focus:border-amber-500 transition-colors"
-              aria-label="Currency"
-            >
-              <option value="€">€ EUR</option>
-              <option value="$">$ USD</option>
-              <option value="£">£ GBP</option>
-              <option value="kr">kr SEK/NOK</option>
-              <option value="CHF">CHF</option>
-            </select>
-
             {(drinkCount > 0 || availableBars.length > 0) && (
               <button
                 onClick={onReset}
