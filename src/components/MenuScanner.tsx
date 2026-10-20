@@ -38,7 +38,7 @@ function computeScanCacheKey(imageBase64?: string | null, textInput?: string): s
   return `${imgPart}||${txtPart}`;
 }
 
-function compressImageFile(file: File, maxDimension = 1150, quality = 0.8): Promise<string> {
+function compressImageFile(file: File, maxDimension = 1280, quality = 0.8): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Failed to read image file'));
@@ -70,6 +70,13 @@ function compressImageFile(file: File, maxDimension = 1150, quality = 0.8): Prom
           // If canvas context fails, fall back to original dataUrl
           resolve(dataUrl);
           return;
+        }
+
+        // Subtle contrast boost sharpens small menu prices for fast Flash-Lite OCR
+        try {
+          ctx.filter = 'contrast(1.12)';
+        } catch {
+          // Ignore if browser canvas does not support filter
         }
 
         ctx.drawImage(img, 0, 0, width, height);
@@ -112,8 +119,58 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [successNote, setSuccessNote] = useState<string | null>(null);
   const [mode, setMode] = useState<'photo' | 'text'>('photo');
   const [isGeminiConfigured, setIsGeminiConfigured] = useState<boolean>(true);
+  const [preScanStatus, setPreScanStatus] = useState<'idle' | 'running' | 'ready'>('idle');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inFlightPreScanRef = useRef<{ key: string; promise: Promise<any> } | null>(null);
+
+  // Speculative background pre-scan: starts analyzing the menu image the instant it is selected
+  const startBackgroundPreScan = (imgDataUrl: string) => {
+    if (!isGeminiConfigured) return;
+    const cacheKey = computeScanCacheKey(imgDataUrl, '');
+    if (scanResultCache.has(cacheKey)) {
+      setPreScanStatus('ready');
+      return;
+    }
+    if (inFlightPreScanRef.current?.key === cacheKey) {
+      return;
+    }
+
+    setPreScanStatus('running');
+    const preScanPromise = (async () => {
+      try {
+        const response = await fetch('/api/scan-menu', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: imgDataUrl,
+            mimeType: 'image/jpeg',
+          }),
+        });
+        if (!response.ok) {
+          setPreScanStatus('idle');
+          return null;
+        }
+        const data = await response.json();
+        if (data?.drinks && Array.isArray(data.drinks) && data.drinks.length > 0) {
+          scanResultCache.set(cacheKey, data);
+          setPreScanStatus('ready');
+          return data;
+        }
+        setPreScanStatus('idle');
+        return null;
+      } catch {
+        setPreScanStatus('idle');
+        return null;
+      } finally {
+        if (inFlightPreScanRef.current?.key === cacheKey) {
+          inFlightPreScanRef.current = null;
+        }
+      }
+    })();
+
+    inFlightPreScanRef.current = { key: cacheKey, promise: preScanPromise };
+  };
 
   useEffect(() => {
     fetch('/api/config')
@@ -142,16 +199,21 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     }
 
     setErrorMessage(null);
+    setSuccessNote(null);
+    setPreScanStatus('idle');
     setIsProcessingImage(true);
 
     try {
-      const compressedDataUrl = await compressImageFile(file, 1150, 0.8);
+      const compressedDataUrl = await compressImageFile(file, 1280, 0.8);
       setImagePreview(compressedDataUrl);
+      startBackgroundPreScan(compressedDataUrl);
     } catch (err: any) {
       console.warn('Image compression fallback to raw data URL:', err);
       const reader = new FileReader();
       reader.onload = () => {
-        setImagePreview(reader.result as string);
+        const rawUrl = reader.result as string;
+        setImagePreview(rawUrl);
+        startBackgroundPreScan(rawUrl);
       };
       reader.readAsDataURL(file);
     } finally {
@@ -186,12 +248,29 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
 
     try {
       const cacheKey = computeScanCacheKey(imagePreview, textToSend);
-      const cached = scanResultCache.get(cacheKey);
+      const imgOnlyKey = computeScanCacheKey(imagePreview, '');
+      const cached =
+        scanResultCache.get(cacheKey) ||
+        (!textToSend.trim() && imagePreview ? scanResultCache.get(imgOnlyKey) : undefined);
       let data: any = null;
+      let joinedPreScan = false;
 
       if (cached) {
         data = cached;
-      } else {
+      } else if (
+        !textToSend.trim() &&
+        imagePreview &&
+        inFlightPreScanRef.current?.key === imgOnlyKey
+      ) {
+        // Join the speculative background pre-scan that started when the image was selected!
+        const preScannedData = await inFlightPreScanRef.current.promise;
+        if (preScannedData && Array.isArray(preScannedData.drinks) && preScannedData.drinks.length > 0) {
+          data = preScannedData;
+          joinedPreScan = true;
+        }
+      }
+
+      if (!data) {
         const response = await fetch('/api/scan-menu', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -272,7 +351,13 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         setSelectedIds(defaultSelected);
 
         const extraNotes: string[] = [];
-        extraNotes.push(cached ? 'instant from cache' : `in ${elapsedSec}s`);
+        extraNotes.push(
+          cached
+            ? 'instant from pre-scan/cache'
+            : joinedPreScan
+              ? `in ${elapsedSec}s via Turbo Pre-Scan`
+              : `in ${elapsedSec}s`
+        );
         if (duplicatesRemoved > 0) {
           extraNotes.push(`${duplicatesRemoved} duplicate line(s) merged`);
         }
@@ -564,10 +649,23 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                 alt="Menu preview"
                 className="max-h-80 w-auto object-contain"
               />
+              {preScanStatus === 'running' && (
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-stone-900/90 text-amber-300 text-[11px] font-semibold border border-amber-500/40 flex items-center gap-1.5">
+                  <RefreshCw className="w-3 h-3 animate-spin text-amber-400" />
+                  <span>Turbo Pre-Scan active...</span>
+                </div>
+              )}
+              {preScanStatus === 'ready' && (
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-stone-900/90 text-emerald-300 text-[11px] font-semibold border border-emerald-500/40 flex items-center gap-1.5">
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span>Pre-Scanned — Instant Extract!</span>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   setImagePreview(null);
+                  setPreScanStatus('idle');
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
                 className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-stone-900/90 text-stone-200 text-xs font-semibold border border-stone-700 hover:bg-stone-800"

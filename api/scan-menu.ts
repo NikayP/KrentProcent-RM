@@ -1,18 +1,22 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
 
-// Initialize Google GenAI client if key is present
-const apiKey = process.env.GEMINI_API_KEY;
+// Lazily initialize Google GenAI client so env vars loaded at runtime are always picked up
 let aiClient: GoogleGenAI | null = null;
-if (apiKey) {
-  aiClient = new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
+function getAiClient(): GoogleGenAI | null {
+  if (aiClient) return aiClient;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (apiKey) {
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
       },
-    },
-  });
+    });
+  }
+  return aiClient;
 }
 
 export const maxDuration = 60;
@@ -54,7 +58,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    if (!aiClient) {
+    const client = getAiClient();
+    if (!client) {
       if (imageBase64 && !textInput) {
         return res.status(400).json({
           error:
@@ -69,19 +74,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    // Ultra-compact prompt: eliminates ~80% of output tokens and JSON formatting overhead
-    const promptText = `Extract all alcoholic drinks from this menu. Ignore UI frames/buttons.
+    // Ultra-compact prompt optimized for both Flash-Lite and Flash models
+    const promptText = `Transcribe ALL alcoholic drinks from every column/section of this menu. Ignore UI frames/buttons.
 ${
   userSpecifiedBar
     ? ''
-    : 'First line if venue name is visible: BAR|Venue Name\n'
+    : 'If venue name is visible, include one line: BAR|Venue Name\n'
 }Output ONLY pipe-separated lines (NO JSON, NO markdown, NO headers, NO extra text):
 Name|Cat|VolumeMl|ABV|Price
-Cat codes: b=beer, w=wine, s=spirit, c=cocktail, ci=cider, o=other
-Defaults if not printed: vaasje=250, fluitje=200, bottle/speciaalbier=330, weizen/pint=500, wine=150, shot=35, pilsabv=5.0.
+Rules:
+- Cat codes: b=beer, w=wine, s=spirit, c=cocktail, ci=cider, o=other
+- Every drink line MUST end with its numeric Price (e.g. 5,1 -> 5.10, (4,90) -> 4.90, €3,60 -> 3.60). If multiple sizes/prices exist (e.g. 0,25 / 0,5L), output a separate line per size.
+- Defaults if not printed: vaasje=250, fluitje=200, bottle/speciaalbier=330, weizen/pint=500, wine=150, shot=35, pilsabv=5.0.
 Example:
-Brand Pilsener|b|250|5.0|3.60
-Duvel|b|330|8.5|4.80`;
+Brand Pilsener|b|250|5.0|3.70
+Gelato Blond|b|330|6.5|6.10
+Duvel|b|330|8.5|6.10`;
 
     const contents: any[] = [];
     if (imageBase64) {
@@ -98,67 +106,136 @@ Duvel|b|330|8.5|4.80`;
       text: promptText + (textInput ? `\n\nMenu:\n${textInput}` : ''),
     });
 
-    // Prioritized fast vision models with thinking disabled (0ms reasoning overhead)
-    const CANDIDATE_MODELS = [
-      'gemini-3.5-flash',
-      'gemini-3.6-flash',
-      'gemini-flash-lite-latest',
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-flash-latest',
-    ];
+    const formattedContents = contents.length === 1 ? contents[0] : { parts: contents };
 
-    let extractedDrinks: any[] = [];
-    let detectedBar = userSpecifiedBar || 'Current Bar';
-    let lastError: any = null;
-    let successfulModel = '';
-
-    for (const modelName of CANDIDATE_MODELS) {
-      try {
-        const modelStart = Date.now();
-        console.log(`[scan-menu] Attempting fast analysis with model: ${modelName}`);
-        const isLiteModel = modelName.includes('lite');
-        const response = await aiClient.models.generateContent({
-          model: modelName,
-          contents: contents.length === 1 ? contents[0] : { parts: contents },
-          config: isLiteModel
-            ? { temperature: 0 }
-            : {
-                temperature: 0,
-                thinkingConfig: {
-                  thinkingBudget: 0,
-                },
+    // Helper to invoke a single model and parse its vision output
+    const runSingleModel = async (modelName: string) => {
+      const modelStart = Date.now();
+      const isLiteModel = modelName.includes('lite');
+      const response = await client.models.generateContent({
+        model: modelName,
+        contents: formattedContents,
+        config: isLiteModel
+          ? { temperature: 0 }
+          : {
+              temperature: 0,
+              thinkingConfig: {
+                thinkingBudget: 0,
               },
-        });
+            },
+      });
+      const rawText = response.text || '';
+      const parsedResult = parseVisionResponse(rawText, userSpecifiedBar);
+      return {
+        modelName,
+        elapsedMs: Date.now() - modelStart,
+        drinks: parsedResult.drinks || [],
+        detectedBarName: parsedResult.detectedBarName,
+      };
+    };
 
-        const rawText = response.text || '';
-        if (rawText.trim().length > 0) {
-          const parsedResult = parseVisionResponse(rawText, userSpecifiedBar);
-          if (parsedResult.drinks && parsedResult.drinks.length > 0) {
-            extractedDrinks = parsedResult.drinks;
-            detectedBar = userSpecifiedBar || parsedResult.detectedBarName || detectedBar;
-            successfulModel = modelName;
-            console.log(
-              `[scan-menu] Success with ${modelName} in ${Date.now() - modelStart}ms! Extracted ${extractedDrinks.length} drinks.`
-            );
-            break;
-          }
+    // Smart parallel race across a wave of models:
+    // - Resolves immediately (0ms wait) when any model returns a full menu (>= 30 drinks)
+    // - If a model returns 1..29 drinks, waits at most 450ms in case a parallel sibling returns a fuller list
+    // - Never blocks on a single model hanging with 503 High Demand or 429 Quota
+    const raceModelWave = (models: string[], waveTimeoutMs = 14000): Promise<{
+      modelName: string;
+      elapsedMs: number;
+      drinks: any[];
+      detectedBarName: string;
+    } | null> => {
+      return new Promise((resolve) => {
+        let settled = false;
+        let pending = models.length;
+        let bestResult: {
+          modelName: string;
+          elapsedMs: number;
+          drinks: any[];
+          detectedBarName: string;
+        } | null = null;
+        let graceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const finish = (
+          winner: {
+            modelName: string;
+            elapsedMs: number;
+            drinks: any[];
+            detectedBarName: string;
+          } | null
+        ) => {
+          if (settled) return;
+          settled = true;
+          if (graceTimer) clearTimeout(graceTimer);
+          clearTimeout(overallTimer);
+          resolve(winner);
+        };
+
+        const overallTimer = setTimeout(() => {
+          finish(bestResult);
+        }, waveTimeoutMs);
+
+        for (const modelName of models) {
+          runSingleModel(modelName)
+            .then((result) => {
+              if (settled) return;
+              if (result.drinks.length > 0) {
+                console.log(
+                  `[scan-menu] ${result.modelName} returned ${result.drinks.length} drinks in ${result.elapsedMs}ms`
+                );
+                if (!bestResult || result.drinks.length > bestResult.drinks.length) {
+                  bestResult = result;
+                }
+                if (result.drinks.length >= 30) {
+                  finish(bestResult);
+                  return;
+                }
+                if (!graceTimer) {
+                  graceTimer = setTimeout(() => {
+                    finish(bestResult);
+                  }, 450);
+                }
+              }
+            })
+            .catch((err: any) => {
+              console.warn(
+                `[scan-menu] ${modelName} error (${err.message?.slice(0, 80)})`
+              );
+            })
+            .finally(() => {
+              pending--;
+              if (pending <= 0 && !settled) {
+                finish(bestResult);
+              }
+            });
         }
-      } catch (err: any) {
-        console.warn(`[scan-menu] Model ${modelName} failed (${err.message?.slice(0, 100)}), falling back...`);
-        lastError = err;
-      }
+      });
+    };
+
+    // Wave 1: Parallel race of the fastest Flash-Lite and Flash models
+    let winningResult = await raceModelWave(
+      ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.5-flash'],
+      12000
+    );
+
+    // Wave 2: Parallel fallback wave only if Wave 1 returned 0 drinks
+    if (!winningResult || winningResult.drinks.length === 0) {
+      console.log('[scan-menu] Wave 1 returned 0 drinks, launching Wave 2 fallback race...');
+      winningResult = await raceModelWave(
+        ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'],
+        15000
+      );
     }
 
-    if (extractedDrinks.length > 0) {
-      const finalBarName = userSpecifiedBar || detectedBar || 'Current Bar';
+    if (winningResult && winningResult.drinks.length > 0) {
+      const finalBarName =
+        userSpecifiedBar || winningResult.detectedBarName || 'Current Bar';
       return res.status(200).json({
         detectedBarName: finalBarName,
-        drinks: extractedDrinks.map((d: any) => ({
+        drinks: winningResult.drinks.map((d: any) => ({
           ...d,
           barName: finalBarName,
         })),
-        modelUsed: successfulModel,
+        modelUsed: winningResult.modelName,
         durationMs: Date.now() - scanStartTime,
       });
     }
@@ -177,7 +254,7 @@ Duvel|b|330|8.5|4.80`;
     return res.status(500).json({
       error:
         'Could not detect any alcoholic drinks from the menu image. Please ensure the menu photo is in focus or try entering text on the "Paste Menu Text" tab.',
-      details: lastError ? lastError.message : 'No drinks recognized',
+      details: 'No drinks recognized',
     });
   } catch (error: any) {
     console.error('Error scanning menu:', error);
@@ -310,6 +387,24 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
           if (parts[5]) {
             notes = parts[5].trim();
           }
+        } else if (parts.length === 4) {
+          // 4 columns: either Name|Cat|ABV|Price or Name|VolumeMl|ABV|Price
+          const secondAsNum = parseFloat(parts[1].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(secondAsNum) && secondAsNum >= 20) {
+            category = 'beer';
+            volumeMl = /\bcl\b/i.test(parts[1]) && secondAsNum < 100 ? Math.round(secondAsNum * 10) : Math.round(secondAsNum);
+          }
+          const aRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(aRaw) && aRaw > 0 && aRaw <= 100) abv = aRaw;
+          const pRaw = parseFloat(parts[3].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(pRaw) && pRaw > 0) price = pRaw;
+        } else if (parts.length === 3) {
+          // 3 columns: Name|ABV|Price
+          category = 'beer';
+          const aRaw = parseFloat(parts[1].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(aRaw) && aRaw > 0 && aRaw <= 100) abv = aRaw;
+          const pRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
+          if (Number.isFinite(pRaw) && pRaw > 0) price = pRaw;
         } else {
           // Fallback column scanning when fewer than 5 columns
           notes = parts.length > 5 ? parts[parts.length - 1] : '';
