@@ -232,51 +232,57 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs Row */}
         <div>
-          <nav className="flex items-center gap-1 bg-stone-950/80 p-1 rounded-xl border border-stone-800 text-xs font-semibold overflow-x-auto no-scrollbar">
+          <nav className="grid grid-cols-3 gap-1.5 bg-stone-950/80 p-1 rounded-xl border border-stone-800 text-xs font-semibold">
+            {/* 1. Left: Drinks Calculator */}
             <button
               onClick={() => setActiveTab('calculator')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'calculator'
                   ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
               }`}
             >
               <Beer className="w-4 h-4 shrink-0" />
-              <span>Drinks ({drinkCount})</span>
+              <span className="truncate">Drinks ({drinkCount})</span>
             </button>
 
+            {/* 2. Center: AI Menu Scanner (Hero Feature) */}
             <button
-              onClick={() => setActiveTab('bars')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
-                activeTab === 'bars'
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
-              }`}
-            >
-              <Store className="w-4 h-4 shrink-0" />
-              <span>Compare Bars ({availableBars.length})</span>
-            </button>
-
-            <button
+              id="tour-nav-scanner"
               onClick={() => setActiveTab('scanner')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'scanner'
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/60'
+                  ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-stone-950 shadow-lg shadow-amber-500/25 font-black ring-1 ring-amber-300'
+                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-400 font-bold shadow-sm'
               }`}
             >
               <Camera className="w-4 h-4 shrink-0" />
-              <span className="flex items-center gap-1">
-                Scan Menu{' '}
+              <span className="flex items-center gap-1 truncate">
+                <span>Scan Menu</span>
                 <span
-                  className={`text-[10px] px-1 rounded font-bold ${
+                  className={`text-[9px] sm:text-[10px] px-1 py-0.5 rounded font-extrabold uppercase leading-none ${
                     activeTab === 'scanner'
-                      ? 'bg-stone-950/20 text-stone-950'
-                      : 'bg-amber-400/20 text-amber-200'
+                      ? 'bg-stone-950/25 text-stone-950'
+                      : 'bg-amber-400/25 text-amber-200 border border-amber-400/30'
                   }`}
                 >
                   AI
                 </span>
+              </span>
+            </button>
+
+            {/* 3. Right: Compare Bars */}
+            <button
+              onClick={() => setActiveTab('bars')}
+              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap min-w-0 ${
+                activeTab === 'bars'
+                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+              }`}
+            >
+              <Store className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                <span className="hidden sm:inline">Compare </span>Bars ({availableBars.length})
               </span>
             </button>
           </nav>
@@ -294,7 +300,7 @@ export const Header: React.FC<HeaderProps> = ({
             </span>
 
             {/* Searchable Bar Picker Popover Container */}
-            <div ref={pickerRef} className="relative min-w-0 max-w-[240px] sm:max-w-[300px]">
+            <div id="tour-sitting-at" ref={pickerRef} className="relative min-w-0 max-w-[240px] sm:max-w-[300px]">
               <button
                 type="button"
                 onClick={() => {

@@ -197,7 +197,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
   ];
 
   return (
-    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+    <div id="tour-drink-form" className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
       {/* Background ambient glow */}
       <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 

@@ -18,12 +18,14 @@ import { Leaderboard } from './components/Leaderboard';
 import { MenuScanner } from './components/MenuScanner';
 import { CrossBarComparison } from './components/CrossBarComparison';
 import { ConfirmModal } from './components/ConfirmModal';
+import { QuickTourModal } from './components/QuickTourModal';
 import { ShieldCheck, Info, Check, Sparkles } from 'lucide-react';
 
 const STORAGE_KEY = 'krentprocent_rm_drinks_v2';
 const MANAGED_BARS_KEY = 'krentprocent_rm_bars_v2';
 const CURRENCY_KEY = 'krentprocent_rm_currency_v2';
 const ACTIVE_BAR_KEY = 'krentprocent_rm_active_bar_v2';
+const TOUR_STORAGE_KEY = 'krentprocent_has_seen_tour_v1';
 
 export default function App() {
   const [drinks, setDrinks] = useState<DrinkItem[]>(() => {
@@ -84,6 +86,43 @@ export default function App() {
   const [barPendingDelete, setBarPendingDelete] = useState<string | null>(null);
   const [resetPending, setResetPending] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Auto-launch quick tour on first visit (or when ?tour=1 URL query parameter is provided)
+  const [isTourOpen, setIsTourOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tour') === '1' || params.get('tour') === 'true') {
+        return true;
+      }
+      const hasSeen = localStorage.getItem(TOUR_STORAGE_KEY);
+      return !hasSeen;
+    } catch {
+      return false;
+    }
+  });
+
+  const handleCloseTour = () => {
+    setIsTourOpen(false);
+    try {
+      localStorage.setItem(TOUR_STORAGE_KEY, 'true');
+    } catch {
+      // ignore storage errors
+    }
+  };
+
+  // Expose resetTour helper to window for effortless testing from DevTools console
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as unknown as { resetTour: () => void }).resetTour = () => {
+        try {
+          localStorage.removeItem(TOUR_STORAGE_KEY);
+        } catch {}
+        console.log('[KrentProcent] Tour status reset. Reloading...');
+        window.location.reload();
+      };
+    }
+  }, []);
 
   const showToast = (msg: string, duration = 3200) => {
     setToastMessage(msg);
@@ -250,6 +289,9 @@ export default function App() {
     setManagedBars([]);
     setActiveBar('all');
     setResetPending(false);
+    try {
+      localStorage.removeItem(TOUR_STORAGE_KEY);
+    } catch {}
     showToast('Cleared all drinks and bars from the board.');
   };
 
@@ -339,7 +381,18 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: Compare & Manage Bars */}
+        {/* TAB 2: AI Menu Scanner (Central Feature) */}
+        {activeTab === 'scanner' && (
+          <MenuScanner
+            onImportDrinks={handleImportDrinks}
+            existingDrinks={drinks}
+            currency={currency}
+            activeBar={activeBar}
+            availableBars={availableBars}
+          />
+        )}
+
+        {/* TAB 3: Compare & Manage Bars */}
         {activeTab === 'bars' && (
           <CrossBarComparison
             drinks={drinks}
@@ -349,17 +402,6 @@ export default function App() {
             onAddBar={handleAddBar}
             onRenameBar={handleRenameBar}
             onDeleteBar={handleDeleteBar}
-          />
-        )}
-
-        {/* TAB 3: AI Menu Scanner */}
-        {activeTab === 'scanner' && (
-          <MenuScanner
-            onImportDrinks={handleImportDrinks}
-            existingDrinks={drinks}
-            currency={currency}
-            activeBar={activeBar}
-            availableBars={availableBars}
           />
         )}
       </main>
@@ -386,6 +428,13 @@ export default function App() {
         variant="danger"
         onConfirm={confirmResetAll}
         onCancel={() => setResetPending(false)}
+      />
+
+      {/* Interactieve Snelle Rondleiding Modal */}
+      <QuickTourModal
+        isOpen={isTourOpen}
+        onClose={handleCloseTour}
+        onNavigateTab={setActiveTab}
       />
 
       {/* Footer & Fallback / Preset Restore Bar */}

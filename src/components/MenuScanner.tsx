@@ -377,7 +377,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   };
 
   return (
-    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-6">
+    <div id="tour-menu-scanner" className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
