@@ -1,5 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
+import {
+  sanitizeDrinkItem,
+  isExplicitZeroAlcohol,
+  normalizeCafePrice,
+} from '../src/utils/calculator';
 
 // Lazily initialize Google GenAI client so env vars loaded at runtime are always picked up
 let aiClient: GoogleGenAI | null = null;
@@ -75,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Ultra-compact prompt optimized for both Flash-Lite and Flash models
-    const promptText = `Transcribe ALL alcoholic drinks from every column/section of this menu. Ignore UI frames/buttons.
+    const promptText = `Transcribe ALL drinks (beers, wines, spirits, ciders) from every column/section of this menu. Ignore UI frames/buttons.
 ${
   userSpecifiedBar
     ? ''
@@ -84,12 +89,13 @@ ${
 Name|Cat|VolumeMl|ABV|Price
 Rules:
 - Cat codes: b=beer, w=wine, s=spirit, c=cocktail, ci=cider, o=other
-- Every drink line MUST end with its numeric Price (e.g. 5,1 -> 5.10, (4,90) -> 4.90, €3,60 -> 3.60). If multiple sizes/prices exist (e.g. 0,25 / 0,5L), output a separate line per size.
+- Every drink line MUST end with its numeric Price (e.g. 5,1 -> 5.10, (4,90) -> 4.90, €3,60 -> 3.60). Do NOT confuse Price with ABV%!
+- CRITICAL: If a drink has "0.0", "0,0", or "Alcoholvrij" in its name (e.g. Heineken 0.0, Amstel Radler 0.0, Guinness 0.0, Affligem 0.0, Paulaner 0.0, Kasteel Rouge 0.0), its ABV MUST be 0.0 (NEVER 5.0!).
 - Defaults if not printed: vaasje=250, fluitje=200, bottle/speciaalbier=330, weizen/pint=500, wine=150, shot=35, pilsabv=5.0.
 Example:
 Brand Pilsener|b|250|5.0|3.70
-Gelato Blond|b|330|6.5|6.10
-Duvel|b|330|8.5|6.10`;
+Heineken 0.0|b|330|0.0|3.50
+Westmalle Tripel|b|330|9.5|5.80`;
 
     const contents: any[] = [];
     if (imageBase64) {
@@ -278,6 +284,36 @@ Duvel|b|330|8.5|6.10`;
 function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
   const finalBar = userSpecifiedBar || 'Current Bar';
 
+  const postProcessItem = (rawItem: {
+    name: string;
+    barName: string;
+    category: string;
+    volumeMl: number;
+    abv: number;
+    price: number;
+    notes?: string;
+  }) => {
+    const snappedPrice = normalizeCafePrice(rawItem.price);
+    const sanitized = sanitizeDrinkItem({
+      name: rawItem.name,
+      barName: rawItem.barName,
+      category: rawItem.category as any,
+      volumeMl: rawItem.volumeMl,
+      abv: isExplicitZeroAlcohol(rawItem.name) ? 0 : rawItem.abv,
+      price: snappedPrice > 0 ? snappedPrice : rawItem.price,
+      notes: rawItem.notes,
+    });
+    return {
+      name: sanitized.name,
+      barName: sanitized.barName || finalBar,
+      category: sanitized.category,
+      volumeMl: sanitized.volumeMl,
+      abv: sanitized.abv,
+      price: sanitized.price,
+      notes: sanitized.notes || '',
+    };
+  };
+
   // 1. Try JSON extraction first
   try {
     const jsonMatch =
@@ -292,15 +328,23 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
     if (Array.isArray(list) && list.length > 0) {
       const validDrinks = list
         .filter((d) => d && (d.name || d.drinkName))
-        .map((d) => ({
-          name: (d.name || d.drinkName || 'Drink').trim(),
-          barName: userSpecifiedBar || d.barName || parsed.detectedBarName || finalBar,
-          category: (d.category || 'beer').toLowerCase(),
-          volumeMl: Number(d.volumeMl) || 330,
-          abv: Number(d.abv) || 5.0,
-          price: Number(d.price) || 4.5,
-          notes: d.notes || '',
-        }))
+        .map((d) => {
+          const rawName = (d.name || d.drinkName || 'Drink').trim();
+          const parsedAbv = Number(d.abv);
+          return postProcessItem({
+            name: rawName,
+            barName: userSpecifiedBar || d.barName || parsed.detectedBarName || finalBar,
+            category: (d.category || 'beer').toLowerCase(),
+            volumeMl: Number(d.volumeMl) || 330,
+            abv: isExplicitZeroAlcohol(rawName)
+              ? 0
+              : Number.isFinite(parsedAbv) && parsedAbv >= 0
+                ? parsedAbv
+                : 5.0,
+            price: Number(d.price) || 4.5,
+            notes: d.notes || '',
+          });
+        })
         .filter((d) => d.price > 0 && d.volumeMl > 0);
 
       if (validDrinks.length > 0) {
@@ -366,7 +410,7 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
         }
 
         let volumeMl = 330;
-        let abv = 5.0;
+        let abv = isExplicitZeroAlcohol(name) ? 0 : 5.0;
         let price = 0;
         let notes = '';
 
@@ -377,7 +421,7 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
             volumeMl = /\bcl\b/i.test(parts[2]) && vRaw < 100 ? Math.round(vRaw * 10) : Math.round(vRaw);
           }
           const aRaw = parseFloat(parts[3].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(aRaw) && aRaw > 0 && aRaw <= 100) {
+          if (Number.isFinite(aRaw) && aRaw >= 0 && aRaw <= 100) {
             abv = aRaw;
           }
           const pRaw = parseFloat(parts[4].replace(',', '.').replace(/[^\d.]/g, ''));
@@ -395,14 +439,14 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
             volumeMl = /\bcl\b/i.test(parts[1]) && secondAsNum < 100 ? Math.round(secondAsNum * 10) : Math.round(secondAsNum);
           }
           const aRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(aRaw) && aRaw > 0 && aRaw <= 100) abv = aRaw;
+          if (Number.isFinite(aRaw) && aRaw >= 0 && aRaw <= 100) abv = aRaw;
           const pRaw = parseFloat(parts[3].replace(',', '.').replace(/[^\d.]/g, ''));
           if (Number.isFinite(pRaw) && pRaw > 0) price = pRaw;
         } else if (parts.length === 3) {
           // 3 columns: Name|ABV|Price
           category = 'beer';
           const aRaw = parseFloat(parts[1].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(aRaw) && aRaw > 0 && aRaw <= 100) abv = aRaw;
+          if (Number.isFinite(aRaw) && aRaw >= 0 && aRaw <= 100) abv = aRaw;
           const pRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
           if (Number.isFinite(pRaw) && pRaw > 0) price = pRaw;
         } else {
@@ -415,7 +459,7 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
               if (v > 0) volumeMl = v;
             } else if (/%/.test(part)) {
               const a = parseFloat(part.replace(',', '.').replace(/[^\d.]/g, ''));
-              if (a > 0 && a <= 100) abv = a;
+              if (a >= 0 && a <= 100) abv = a;
             } else if (/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})/.test(part)) {
               const m = part.match(/(\d+[.,]\d{1,2})/);
               if (m) price = parseFloat(m[1].replace(',', '.'));
@@ -429,15 +473,17 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
         }
 
         if (name && price > 0) {
-          items.push({
-            name,
-            barName: detectedBarFromHeader,
-            category,
-            volumeMl,
-            abv,
-            price,
-            notes,
-          });
+          items.push(
+            postProcessItem({
+              name,
+              barName: detectedBarFromHeader,
+              category,
+              volumeMl,
+              abv,
+              price,
+              notes,
+            })
+          );
           continue;
         }
       }
@@ -449,7 +495,11 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
     if (priceMatch) {
       const price = parseFloat(priceMatch[1].replace(',', '.'));
       const abvMatch = line.match(/(\d+(?:[.,]\d+)?)\s*%/);
-      const abv = abvMatch ? parseFloat(abvMatch[1].replace(',', '.')) : 5.0;
+      const abv = isExplicitZeroAlcohol(line)
+        ? 0
+        : abvMatch
+          ? parseFloat(abvMatch[1].replace(',', '.'))
+          : 5.0;
 
       const name = line
         .replace(/[*_#•-]/g, ' ')
@@ -460,15 +510,17 @@ function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
         .trim();
 
       if (name && name.length >= 2 && price > 0 && price < 100) {
-        items.push({
-          name,
-          barName: detectedBarFromHeader,
-          category: 'beer',
-          volumeMl: 330,
-          abv,
-          price,
-          notes: '',
-        });
+        items.push(
+          postProcessItem({
+            name,
+            barName: detectedBarFromHeader,
+            category: 'beer',
+            volumeMl: 330,
+            abv,
+            price,
+            notes: '',
+          })
+        );
       }
     }
   }
@@ -507,8 +559,9 @@ function parseMenuFallback(text: string, userSpecifiedBar?: string) {
     const volumeMatch = line.match(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|l|liter|pint)\b/i);
 
     if (priceMatch) {
-      const price = parseFloat(priceMatch[1].replace(',', '.'));
-      if (!Number.isFinite(price) || price <= 0) continue;
+      const rawPrice = parseFloat(priceMatch[1].replace(',', '.'));
+      if (!Number.isFinite(rawPrice) || rawPrice <= 0) continue;
+      const price = normalizeCafePrice(rawPrice) || rawPrice;
 
       const lowerLine = line.toLowerCase();
       let category = 'beer';
@@ -529,11 +582,11 @@ function parseMenuFallback(text: string, userSpecifiedBar?: string) {
         cocktail: 10.0,
         cider: 4.5,
       };
-      const abv = abvMatch
-        ? parseFloat(abvMatch[1].replace(',', '.'))
-        : defaultAbvByCategory[category] ?? 5.0;
-
-      if (abv <= 0) continue;
+      const abv = isExplicitZeroAlcohol(line)
+        ? 0
+        : abvMatch
+          ? parseFloat(abvMatch[1].replace(',', '.'))
+          : defaultAbvByCategory[category] ?? 5.0;
 
       const defaultVolByCategory: Record<string, number> = {
         beer: 330,
@@ -578,15 +631,24 @@ function parseMenuFallback(text: string, userSpecifiedBar?: string) {
       if (!name) name = 'Drink Item';
 
       const finalBar = userSpecifiedBar || detectedHeaderBar || 'De Bruine Kroeg';
-
-      items.push({
+      const sanitized = sanitizeDrinkItem({
         name,
         barName: finalBar,
-        category,
+        category: category as any,
         volumeMl,
         abv,
         price,
         notes: 'Parsed from text',
+      });
+
+      items.push({
+        name: sanitized.name,
+        barName: finalBar,
+        category: sanitized.category,
+        volumeMl: sanitized.volumeMl,
+        abv: sanitized.abv,
+        price: sanitized.price,
+        notes: sanitized.notes || 'Parsed from text',
       });
     }
   }

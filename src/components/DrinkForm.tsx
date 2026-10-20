@@ -120,7 +120,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
   const submitWithMode = (mode: 'update_existing' | 'force_add') => {
     if (!name.trim()) return;
-    if (volumeMl <= 0 || price <= 0 || abv <= 0) return;
+    if (volumeMl <= 0 || price <= 0 || abv < 0) return;
 
     const newDrink: DrinkItem = {
       id: `drink-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -519,7 +519,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               <input
                 id="drink-abv"
                 type="number"
-                min="0.1"
+                min="0"
                 max="100"
                 step="0.1"
                 value={abv || ''}

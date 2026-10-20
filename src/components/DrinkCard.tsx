@@ -83,7 +83,7 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
 
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editName.trim() || editVolume <= 0 || editAbv <= 0 || editPrice <= 0) return;
+    if (!editName.trim() || editVolume <= 0 || editAbv < 0 || editPrice <= 0) return;
     if (onUpdate) {
       onUpdate({
         ...drink,
@@ -215,7 +215,7 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
               </label>
               <input
                 type="number"
-                min="0.1"
+                min="0"
                 max="100"
                 step="0.1"
                 value={editAbv}

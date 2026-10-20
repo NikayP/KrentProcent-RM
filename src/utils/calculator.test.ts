@@ -23,6 +23,9 @@ import {
   renameBarInDrinks,
   findCrossBarCommonDrinks,
   sanitizeDrinkItem,
+  isExplicitZeroAlcohol,
+  matchKnownDrinkSpec,
+  normalizeCafePrice,
 } from './calculator.ts';
 import type { DrinkItem } from './calculator.ts';
 
@@ -381,4 +384,143 @@ test('findCrossBarCommonDrinks identifies identical drinks sold across multiple 
   assert.equal(common[0].bestEntry.barName, 'Bar A');
   assert.equal(common[0].worstEntry.barName, 'Bar B');
   assert.equal(common[0].maxPriceDifference, 1.0);
+});
+
+test('0.0% non-alcoholic beers are strictly forced to 0.0% ABV and sink to bottom of ranking', () => {
+  const zeroBeers = [
+    'Amstel Radler 0.0',
+    'Heineken 0.0',
+    'Guinness 0.0',
+    'Affligem Blond 0.0',
+    'Paulaner 0.0',
+    'Kasteel Rouge 0.0',
+  ];
+
+  for (const name of zeroBeers) {
+    assert.equal(isExplicitZeroAlcohol(name), true, `${name} should be detected as 0.0%`);
+    // Even if a parser or caller erroneously passes abv: 5.0, sanitizeDrinkItem forces it to 0.0!
+    const sanitized = sanitizeDrinkItem({
+      name,
+      category: 'beer',
+      volumeMl: 330,
+      abv: 5.0,
+      price: 3.5,
+      barName: 'Café de Opera',
+    });
+    assert.equal(sanitized.abv, 0, `${name} must have 0% ABV after sanitization`);
+    const metrics = calculateDrinkMetrics(sanitized);
+    assert.equal(metrics.pureAlcoholMl, 0);
+    assert.equal(metrics.pureAlcoholPerCurrency, 0);
+  }
+
+  // Verify they rank at the very bottom below any alcoholic drink
+  const ranked = rankDrinks([
+    sanitizeDrinkItem({ name: 'Heineken 0.0', volumeMl: 330, abv: 5.0, price: 3.5 }),
+    sanitizeDrinkItem({ name: 'Brand Pilsener', volumeMl: 250, abv: 5.0, price: 3.7 }),
+  ]);
+  assert.equal(ranked[0].name, 'Brand Pilsener');
+  assert.equal(ranked[1].name, 'Heineken 0.0');
+  assert.equal(ranked[1].pureAlcoholPerCurrency, 0);
+});
+
+test('known beer ABV and price-as-ABV error corrections (Brand 3.7% -> 5.0%, Oersoep Big Bob -> 0.3%)', () => {
+  // Brand scanned with 3.7% ABV because price was €3.70 -> auto-corrected to 5.0%
+  const brand = sanitizeDrinkItem({
+    name: 'Brand',
+    category: 'beer',
+    volumeMl: 250,
+    abv: 3.7,
+    price: 3.7,
+    barName: 'De Waagh',
+  });
+  assert.equal(brand.name, 'Brand Pilsener');
+  assert.equal(brand.abv, 5.0);
+
+  // Oersoep Big Bob erroneously set to 5.0% at Opera -> auto-corrected to 0.3%
+  const bigBobOpera = sanitizeDrinkItem({
+    name: 'Oersoep Big Bob',
+    category: 'beer',
+    volumeMl: 330,
+    abv: 5.0,
+    price: 4.5,
+    barName: 'Café de Opera',
+  });
+  assert.equal(bigBobOpera.abv, 0.3);
+
+  // Weird OCR price like €7.03 for Westmalle Tripel snaps to €7.00
+  assert.equal(normalizeCafePrice(7.03), 7.0);
+  assert.equal(normalizeCafePrice(5.8), 5.8);
+});
+
+test('canonical drink name matching unifies naming variations across bars', () => {
+  // 1. "Westmalle Tripel" vs "Westmalle Tripel Trappist"
+  assert.equal(
+    areDrinkNamesEquivalent('Westmalle Tripel', 'Westmalle Tripel Trappist'),
+    true
+  );
+  // 2. "Tripel Karmeliet" vs "Karmeliet Tripel"
+  assert.equal(
+    areDrinkNamesEquivalent('Tripel Karmeliet', 'Karmeliet Tripel'),
+    true
+  );
+  // 3. "Barbar Blond" vs "Barbãr"
+  assert.equal(
+    areDrinkNamesEquivalent('Barbar Blond', 'Barbãr'),
+    true
+  );
+
+  // Verify Cross-Bar Comparison automatically groups them together!
+  const crossBarDrinks: DrinkItem[] = [
+    sanitizeDrinkItem({
+      id: '1',
+      name: 'Westmalle Tripel Trappist',
+      volumeMl: 330,
+      abv: 9.5,
+      price: 5.0,
+      barName: 'Café de Opera',
+    }),
+    sanitizeDrinkItem({
+      id: '2',
+      name: 'Westmalle Tripel',
+      volumeMl: 330,
+      abv: 9.5,
+      price: 7.0,
+      barName: 'Cafe in de Blaauwe Hand',
+    }),
+    sanitizeDrinkItem({
+      id: '3',
+      name: 'Karmeliet Tripel',
+      volumeMl: 330,
+      abv: 8.4,
+      price: 5.5,
+      barName: 'Café de Opera',
+    }),
+    sanitizeDrinkItem({
+      id: '4',
+      name: 'Tripel Karmeliet',
+      volumeMl: 330,
+      abv: 8.4,
+      price: 6.0,
+      barName: 'De Bruine Kroeg',
+    }),
+    sanitizeDrinkItem({
+      id: '5',
+      name: 'Barbãr',
+      volumeMl: 330,
+      abv: 8.0,
+      price: 5.2,
+      barName: 'Café de Opera',
+    }),
+    sanitizeDrinkItem({
+      id: '6',
+      name: 'Barbar Blond',
+      volumeMl: 330,
+      abv: 8.0,
+      price: 5.8,
+      barName: 'De Waagh',
+    }),
+  ];
+
+  const common = findCrossBarCommonDrinks(crossBarDrinks);
+  assert.equal(common.length, 3);
 });

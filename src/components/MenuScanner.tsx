@@ -19,6 +19,8 @@ import {
   deduplicateDrinksPerBar,
   calculateDrinkMetrics,
   areBarNamesEquivalent,
+  sanitizeDrinkItem,
+  isExplicitZeroAlcohol,
 } from '../utils/calculator';
 import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
 
@@ -318,16 +320,26 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       setTargetBar(canonicalTarget);
 
       if (data.drinks && Array.isArray(data.drinks) && data.drinks.length > 0) {
-        const rawFormatted: DrinkItem[] = data.drinks.map((d: any, idx: number) => ({
-          id: `scanned-${Date.now()}-${idx}`,
-          name: d.name || `Scanned Drink #${idx + 1}`,
-          barName: canonicalTarget,
-          category: (d.category as DrinkCategory) || 'beer',
-          volumeMl: Number(d.volumeMl) || 330,
-          abv: Number(d.abv) || 5.0,
-          price: Number(d.price) || 5.0,
-          notes: d.notes || 'Scanned from menu',
-        }));
+        const rawFormatted: DrinkItem[] = data.drinks.map((d: any, idx: number) => {
+          const rawName = d.name || `Scanned Drink #${idx + 1}`;
+          const parsedAbv = Number(d.abv);
+          const safeAbv = isExplicitZeroAlcohol(rawName)
+            ? 0
+            : Number.isFinite(parsedAbv) && parsedAbv >= 0
+              ? parsedAbv
+              : 5.0;
+
+          return sanitizeDrinkItem({
+            id: `scanned-${Date.now()}-${idx}`,
+            name: rawName,
+            barName: canonicalTarget,
+            category: (d.category as DrinkCategory) || 'beer',
+            volumeMl: Number(d.volumeMl) || 330,
+            abv: safeAbv,
+            price: Number(d.price) || 5.0,
+            notes: d.notes || 'Scanned from menu',
+          });
+        });
 
         // Deduplicate within the scan batch itself
         const { drinks: formatted, duplicatesRemoved } = deduplicateDrinksPerBar(
