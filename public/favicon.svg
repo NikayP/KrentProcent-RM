@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="45%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded Badge Background matching the App Logo -->
+  <rect width="64" height="64" rx="16" fill="url(#amberGrad)"/>
+  
+  <!-- Beer Mug Icon in deep dark stone matching #0c0a09 -->
+  <!-- Mug body -->
+  <path d="M19 22 C19 20.3 20.3 19 22 19 L38 19 C39.7 19 41 20.3 41 22 L41 44 C41 47.3 38.3 50 35 50 L25 50 C21.7 50 19 47.3 19 44 Z" fill="#0c0a09"/>
+  <!-- Handle -->
+  <path d="M41 26 L45 26 C48.3 26 51 28.7 51 32 L51 37 C51 40.3 48.3 43 45 43 L41 43" fill="none" stroke="#0c0a09" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- Foam highlight -->
+  <path d="M22 17 C22 15.3 23.3 14 25 14 C26.3 14 27.4 14.8 27.8 16 C28.4 15.4 29.2 15 30.1 15 C31.3 15 32.3 15.7 32.8 16.7 C33.3 16.3 34 16 34.8 16 C36.5 16 38 17.3 38 19 L22 19 Z" fill="#fef3c7"/>
+  <!-- Froth bubbles interior detail -->
+  <circle cx="26" cy="27" r="1.5" fill="#f59e0b"/>
+  <circle cx="33" cy="33" r="1.8" fill="#f59e0b"/>
+  <circle cx="28" cy="38" r="1.5" fill="#f59e0b"/>
+</svg>
