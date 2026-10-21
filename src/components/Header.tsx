@@ -229,7 +229,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="truncate">Drinks ({drinkCount})</span>
             </button>
 
-            {/* 2. Center: AI Menu Scanner (Hero Feature) */}
+            {/* 2. Center: Menu Scanner (Hero Feature) */}
             <button
               id="tour-nav-scanner"
               onClick={() => setActiveTab('scanner')}
@@ -240,18 +240,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Camera className="w-4 h-4 shrink-0" />
-              <span className="flex items-center gap-1 truncate">
-                <span>Scan Menu</span>
-                <span
-                  className={`text-[9px] sm:text-[10px] px-1 py-0.5 rounded font-extrabold uppercase leading-none ${
-                    activeTab === 'scanner'
-                      ? 'bg-stone-950/25 text-stone-950'
-                      : 'bg-amber-400/25 text-amber-200 border border-amber-400/30'
-                  }`}
-                >
-                  AI
-                </span>
-              </span>
+              <span className="truncate">Scan Menu</span>
             </button>
 
             {/* 3. Right: Compare Bars */}
