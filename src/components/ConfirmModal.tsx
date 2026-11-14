@@ -35,11 +35,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-md bg-stone-900 border border-stone-800 rounded-2xl p-5 sm:p-6 shadow-2xl relative space-y-4"
+        className="w-full max-w-md bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-2xl relative space-y-4"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -49,7 +49,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="absolute top-4 right-4 p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-xl text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] transition-colors"
           aria-label="Close"
         >
           <X className="w-4 h-4" />
@@ -60,8 +60,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <div
             className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
               variant === 'danger'
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                ? 'bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30'
+                : 'bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40'
             }`}
           >
             {variant === 'danger' ? (
@@ -72,21 +72,21 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </div>
 
           <div className="pr-6">
-            <h3 id="confirm-modal-title" className="text-base sm:text-lg font-bold text-white">
+            <h3 id="confirm-modal-title" className="text-base sm:text-lg font-bold text-[#18181B] dark:text-[#FFFFFF]">
               {title}
             </h3>
-            <p className="text-xs sm:text-sm text-stone-400 mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1 leading-relaxed">
               {message}
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-stone-800">
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E4E4E7] dark:border-[#27272A]">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-750 border border-stone-700 transition-colors"
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-[#18181B] dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white bg-[#FFF2F3] dark:bg-[#121214] hover:bg-zinc-100 dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors"
           >
             {cancelLabel}
           </button>
@@ -94,11 +94,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-lg transition-all flex items-center gap-1.5 ${
-              variant === 'danger'
-                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/40'
-                : 'bg-amber-500 hover:bg-amber-400 text-stone-950 shadow-amber-900/40'
-            }`}
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 bg-[#F21B2D] hover:bg-[#D91424] text-white"
           >
             <Trash2 className="w-4 h-4" />
             <span>{confirmLabel}</span>

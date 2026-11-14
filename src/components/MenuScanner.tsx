@@ -474,17 +474,17 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   };
 
   return (
-    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-6">
+    <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 sm:p-6 shadow-sm space-y-6">
       {/* Header */}
       <div id="tour-scanner-sample" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400">
+            <span className="p-1.5 rounded-xl bg-[#FF8A8E]/20 text-[#F21B2D]">
               <Camera className="w-5 h-5" />
             </span>
-            <h2 className="text-lg font-black text-white">Menu Photo &amp; Screenshot Scanner</h2>
+            <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF]">Menu Photo &amp; Screenshot Scanner</h2>
           </div>
-          <p className="text-xs text-stone-400 mt-1">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Snap a photo of the pub chalkboard, tap list, or drinks card. Our AI extracts volume,
             ABV, and price and checks for existing duplicates at this bar!
           </p>
@@ -496,9 +496,9 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             type="button"
             onClick={handleLoadOperaSample}
             disabled={isScanning}
-            className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/50 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+            className="px-3.5 py-2 rounded-xl bg-[#FF8A8E]/20 hover:bg-[#FF8A8E]/30 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Sparkles className="w-4 h-4 text-[#F21B2D]" />
             <span>Try Sample Café de Opera Menu</span>
           </button>
 
@@ -506,21 +506,21 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             type="button"
             onClick={handleLoadSample}
             disabled={isScanning}
-            className="px-3 py-2 rounded-xl bg-stone-850 hover:bg-stone-800 text-stone-300 border border-stone-750 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
+            className="px-3 py-2 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
           >
-            <Sparkles className="w-4 h-4 text-stone-400" />
+            <Sparkles className="w-4 h-4 text-zinc-400" />
             <span>De Bruine Kroeg</span>
           </button>
         </div>
       </div>
 
       {/* Target Bar Selector */}
-      <div className="bg-stone-950/80 p-3.5 rounded-xl border border-stone-800 space-y-2">
+      <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3.5 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] space-y-2">
         <label
           htmlFor="scanner-bar-input"
-          className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5"
+          className="text-xs font-bold text-[#F21B2D] uppercase tracking-wider flex items-center gap-1.5"
         >
-          <Store className="w-4 h-4 text-amber-400" />
+          <Store className="w-4 h-4 text-[#F21B2D]" />
           <span>Which Bar / Pub is this menu from?</span>
         </label>
         <div className="flex flex-col sm:flex-row gap-2">
@@ -531,7 +531,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             value={targetBar}
             onChange={(e) => handleTargetBarChange(e.target.value)}
             placeholder="e.g. De Bruine Kroeg, Café Gollem, The Waterhole..."
-            className="flex-1 bg-stone-900 text-white font-medium text-xs sm:text-sm rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400"
+            className="flex-1 bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] font-medium text-xs sm:text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
           />
           <datalist id="scanner-bars-datalist">
             {availableBars.map((b) => (
@@ -545,10 +545,10 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                   key={b}
                   type="button"
                   onClick={() => handleTargetBarChange(b)}
-                  className={`text-[11px] px-2.5 py-1.5 rounded-lg border whitespace-nowrap font-semibold transition-colors ${
+                  className={`text-[11px] px-2.5 py-1.5 rounded-xl border whitespace-nowrap font-semibold transition-colors ${
                     areBarNamesEquivalent(targetBar, b)
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-400/50'
-                      : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200'
+                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white border-[#F21B2D]'
+                      : 'bg-[#FFFFFF] dark:bg-[#18181B] text-zinc-600 dark:text-zinc-400 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
                   }`}
                 >
                   {b}
@@ -563,7 +563,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                     if (e.target.value) handleTargetBarChange(e.target.value);
                   }}
                   aria-label="Select known bar"
-                  className="text-[11px] px-2.5 py-1.5 rounded-lg bg-stone-900 text-amber-300 border border-stone-700 font-semibold focus:outline-none focus:border-amber-400"
+                  className="text-[11px] px-2.5 py-1.5 rounded-xl bg-[#FFFFFF] dark:bg-[#18181B] text-[#F21B2D] border border-[#E4E4E7] dark:border-[#27272A] font-semibold focus:outline-none focus:border-[#F21B2D]"
                 >
                   <option value="">+{availableBars.length - 4} more...</option>
                   {availableBars.map((b) => (
@@ -579,14 +579,14 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       </div>
 
       {/* Mode Switcher: Photo or Text */}
-      <div className="flex items-center gap-2 border-b border-stone-800 pb-3">
+      <div className="flex items-center gap-2 border-b border-[#E4E4E7] dark:border-[#27272A] pb-3">
         <button
           type="button"
           onClick={() => setMode('photo')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
             mode === 'photo'
-              ? 'bg-amber-500 text-stone-950 font-bold'
-              : 'text-stone-400 hover:text-stone-200'
+              ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold shadow-sm'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-[#FFF2F3] dark:hover:bg-[#121214]'
           }`}
         >
           <Camera className="w-4 h-4" />
@@ -596,10 +596,10 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         <button
           type="button"
           onClick={() => setMode('text')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
             mode === 'text'
-              ? 'bg-amber-500 text-stone-950 font-bold'
-              : 'text-stone-400 hover:text-stone-200'
+              ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold shadow-sm'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-[#FFF2F3] dark:hover:bg-[#121214]'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -611,12 +611,12 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       {mode === 'photo' ? (
         <div className="space-y-4">
           {!isGeminiConfigured && (
-            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+            <div className="p-3.5 rounded-xl bg-[#FF8A8E]/15 border border-[#FF8A8E]/40 text-[#D91424] dark:text-[#FF8A8E] text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-[#F21B2D] mt-0.5" />
               <div className="space-y-1">
-                <p className="font-bold text-white">Gemini API Key Required for Image Scanning</p>
-                <p className="text-stone-300">
-                  AI vision menu extraction requires <code className="text-amber-300 bg-stone-900 px-1 py-0.5 rounded">GEMINI_API_KEY</code> in your <code className="text-amber-300 bg-stone-900 px-1 py-0.5 rounded">.env</code> file. Without it, you can use the <strong>Paste Menu Text</strong> tab to parse menus locally without an API key!
+                <p className="font-bold text-[#18181B] dark:text-[#FFFFFF]">Gemini API Key Required for Image Scanning</p>
+                <p className="text-zinc-600 dark:text-zinc-300">
+                  AI vision menu extraction requires <code className="text-[#D91424] dark:text-[#FF8A8E] bg-[#FFFFFF] dark:bg-[#121214] px-1 py-0.5 rounded border border-[#E4E4E7] dark:border-[#27272A]">GEMINI_API_KEY</code> in your <code className="text-[#D91424] dark:text-[#FF8A8E] bg-[#FFFFFF] dark:bg-[#121214] px-1 py-0.5 rounded border border-[#E4E4E7] dark:border-[#27272A]">.env</code> file. Without it, you can use the <strong>Paste Menu Text</strong> tab to parse menus locally without an API key!
                 </p>
               </div>
             </div>
@@ -634,42 +634,42 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
           {!imagePreview ? (
             <div
               onClick={() => !isProcessingImage && fileInputRef.current?.click()}
-              className={`border-2 border-dashed border-stone-700 hover:border-amber-400/60 rounded-2xl p-8 text-center cursor-pointer transition-colors bg-stone-950/40 hover:bg-stone-950/80 group ${
+              className={`border-2 border-dashed border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] rounded-2xl p-8 text-center cursor-pointer transition-colors bg-[#FFF2F3]/50 dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#18181B] group ${
                 isProcessingImage ? 'opacity-60 cursor-wait' : ''
               }`}
             >
-              <div className="w-14 h-14 rounded-2xl bg-stone-850 group-hover:bg-amber-500/20 text-stone-400 group-hover:text-amber-400 flex items-center justify-center mx-auto mb-3 transition-colors border border-stone-750">
+              <div className="w-14 h-14 rounded-2xl bg-[#FFFFFF] dark:bg-[#18181B] group-hover:bg-[#FF8A8E]/20 text-zinc-400 group-hover:text-[#F21B2D] flex items-center justify-center mx-auto mb-3 transition-colors border border-[#E4E4E7] dark:border-[#27272A]">
                 {isProcessingImage ? (
-                  <RefreshCw className="w-6 h-6 animate-spin text-amber-400" />
+                  <RefreshCw className="w-6 h-6 animate-spin text-[#F21B2D]" />
                 ) : (
                   <Upload className="w-6 h-6" />
                 )}
               </div>
-              <h4 className="text-sm font-bold text-white mb-1">
+              <h4 className="text-sm font-bold text-[#18181B] dark:text-[#FFFFFF] mb-1">
                 {isProcessingImage ? 'Optimizing Photo...' : 'Take Photo or Upload Menu Screenshot'}
               </h4>
-              <p className="text-xs text-stone-400 max-w-sm mx-auto">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
                 {isProcessingImage
                   ? 'Resizing image for fast and sharp AI scanning...'
                   : 'Supports camera capture on mobile or JPG, PNG, WebP screenshots from bar apps.'}
               </p>
             </div>
           ) : (
-            <div className="relative rounded-2xl overflow-hidden border border-stone-700 bg-stone-950 max-h-80 flex items-center justify-center">
+            <div className="relative rounded-2xl overflow-hidden border border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/40 dark:bg-[#121214] max-h-80 flex items-center justify-center">
               <img
                 src={imagePreview}
                 alt="Menu preview"
                 className="max-h-80 w-auto object-contain"
               />
               {preScanStatus === 'running' && (
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-stone-900/90 text-amber-300 text-[11px] font-semibold border border-amber-500/40 flex items-center gap-1.5">
-                  <RefreshCw className="w-3 h-3 animate-spin text-amber-400" />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-xl bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 text-[#D91424] dark:text-[#FF8A8E] text-[11px] font-semibold border border-[#FF8A8E]/40 flex items-center gap-1.5 shadow-sm">
+                  <RefreshCw className="w-3 h-3 animate-spin text-[#F21B2D]" />
                   <span>Turbo Pre-Scan active...</span>
                 </div>
               )}
               {preScanStatus === 'ready' && (
-                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-stone-900/90 text-emerald-300 text-[11px] font-semibold border border-emerald-500/40 flex items-center gap-1.5">
-                  <Check className="w-3 h-3 text-emerald-400" />
+                <div className="absolute top-3 left-3 px-2.5 py-1 rounded-xl bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/40 flex items-center gap-1.5 shadow-sm">
+                  <Check className="w-3 h-3 text-emerald-500" />
                   <span>Pre-Scanned — Instant Extract!</span>
                 </div>
               )}
@@ -680,7 +680,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                   setPreScanStatus('idle');
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
-                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-stone-900/90 text-stone-200 text-xs font-semibold border border-stone-700 hover:bg-stone-800"
+                className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 text-[#18181B] dark:text-zinc-200 text-xs font-semibold border border-[#E4E4E7] dark:border-[#27272A] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] shadow-sm"
               >
                 Change Photo
               </button>
@@ -692,7 +692,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
               type="button"
               onClick={() => handleScan()}
               disabled={isScanning || isProcessingImage}
-              className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-extrabold tracking-[-0.01em] text-sm flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
             >
               {isScanning ? (
                 <>
@@ -710,7 +710,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
-          <label htmlFor="menu-text-area" className="block text-xs font-semibold text-stone-300">
+          <label htmlFor="menu-text-area" className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300">
             Paste Menu Text / Tap List:
           </label>
           <textarea
@@ -719,14 +719,14 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
             placeholder={`Example:\nHeineken Vaasje 25cl 5% €3.60\nTripel Karmeliet 33cl 8.4% €5.90\nGuinness Pint 50cl €6.80`}
-            className="w-full bg-stone-950 text-white rounded-xl p-3 text-xs sm:text-sm font-mono border border-stone-700 focus:outline-none focus:border-amber-400 placeholder:text-stone-600"
+            className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl p-3 text-xs sm:text-sm font-mono border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
           />
 
           <button
             type="button"
             onClick={() => handleScan()}
             disabled={isScanning || !textInput.trim()}
-            className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-extrabold tracking-[-0.01em] text-sm flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
           >
             {isScanning ? (
               <>
@@ -745,9 +745,9 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
 
       {/* Messages */}
       {errorMessage && (
-        <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-800 text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div className="p-3.5 rounded-xl bg-[#F21B2D]/10 border border-[#F21B2D]/40 text-[#D91424] dark:text-[#FF8A8E] text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex items-start sm:items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5 sm:mt-0" />
+            <AlertCircle className="w-4 h-4 shrink-0 text-[#F21B2D] mt-0.5 sm:mt-0" />
             <span className="leading-relaxed">{errorMessage}</span>
           </div>
           {imagePreview && (
@@ -755,7 +755,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
               type="button"
               onClick={() => handleScan()}
               disabled={isScanning}
-              className="px-3 py-1.5 rounded-lg bg-rose-900/80 hover:bg-rose-800 text-white font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 border border-rose-700/60 transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold text-xs flex items-center gap-1.5 self-start sm:self-auto shrink-0 transition-colors"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
               <span>Retry Scan</span>
@@ -765,7 +765,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       )}
 
       {successNote && (
-        <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center gap-2">
           <Check className="w-4 h-4 shrink-0" />
           <span>{successNote}</span>
         </div>
@@ -773,16 +773,16 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
 
       {/* Extracted Drinks Review Table */}
       {scannedDrinks.length > 0 && (
-        <div className="space-y-4 pt-4 border-t border-stone-800">
+        <div className="space-y-4 pt-4 border-t border-[#E4E4E7] dark:border-[#27272A]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <h3 className="text-sm font-extrabold tracking-[-0.02em] text-[#18181B] dark:text-[#FFFFFF] flex items-center gap-2">
                 <span>Detected Drinks for {targetBar}</span>
-                <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30 font-mono whitespace-nowrap shrink-0">
+                <span className="text-xs bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] px-2 py-0.5 rounded-full border border-[#FF8A8E]/40 tabular-nums font-bold whitespace-nowrap shrink-0">
                   {scannedDrinks.length} found
                 </span>
               </h3>
-              <p className="text-[11px] text-stone-400">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
                 Adjust any details before importing. Existing duplicates in {targetBar} are
                 automatically flagged.
               </p>
@@ -792,16 +792,16 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
               <button
                 type="button"
                 onClick={toggleSelectAll}
-                className="text-xs text-stone-400 hover:text-stone-200 underline"
+                className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#F21B2D] underline"
               >
                 {selectedIds.size === scannedDrinks.length ? 'Deselect All' : 'Select All'}
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-stone-800 bg-stone-950/60 pb-1">
+          <div className="overflow-x-auto rounded-xl border border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/30 dark:bg-[#121214] pb-1">
             <table className="w-full min-w-[680px] text-left text-xs">
-              <thead className="bg-stone-900 text-stone-400 uppercase font-semibold text-[10px] tracking-wider border-b border-stone-800">
+              <thead className="bg-[#FFF2F3] dark:bg-[#18181B] text-zinc-500 dark:text-zinc-400 uppercase font-semibold text-[10px] tracking-wider border-b border-[#E4E4E7] dark:border-[#27272A]">
                 <tr>
                   <th className="p-2.5 w-8 text-center">Inc</th>
                   <th className="p-2.5">Drink Name</th>
@@ -812,7 +812,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                   <th className="p-2.5 w-24 text-right">Krent Score</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-800/60">
+              <tbody className="divide-y divide-[#E4E4E7] dark:divide-[#27272A]">
                 {scannedDrinks.map((drink) => {
                   const isChecked = selectedIds.has(drink.id);
                   const dup = duplicateStatuses.get(drink.id);
@@ -821,8 +821,8 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                   return (
                     <tr
                       key={drink.id}
-                      className={`hover:bg-stone-900/40 transition-colors ${
-                        isChecked ? 'bg-amber-500/5' : 'opacity-60'
+                      className={`hover:bg-[#FFF2F3]/60 dark:hover:bg-[#18181B] transition-colors ${
+                        isChecked ? 'bg-[#FF8A8E]/10' : 'opacity-60'
                       }`}
                     >
                       <td className="p-2.5 text-center">
@@ -830,7 +830,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => toggleSelect(drink.id)}
-                          className="rounded border-stone-700 text-amber-500 focus:ring-amber-400 h-4 w-4 bg-stone-900"
+                          className="rounded border-[#E4E4E7] dark:border-[#27272A] accent-[#F21B2D] h-4 w-4"
                         />
                       </td>
 
@@ -841,33 +841,33 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                           onChange={(e) =>
                             handleUpdateScannedItem(drink.id, 'name', e.target.value)
                           }
-                          className="w-full bg-stone-900 text-white rounded px-2 py-1 text-xs border border-stone-800 focus:border-amber-400 font-medium"
+                          className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] rounded-lg px-2 py-1 text-xs border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] font-medium"
                         />
                       </td>
 
                       <td className="p-2.5">
                         {!dup ? (
-                          <span className="inline-block whitespace-nowrap text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                          <span className="inline-block whitespace-nowrap text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                             New in bar
                           </span>
                         ) : dup.matchType === 'exact' ? (
                           <span
                             title="Exact same drink, volume, ABV, and price already in this bar"
-                            className="inline-block whitespace-nowrap text-[10px] font-bold bg-stone-800 text-stone-400 border border-stone-700 px-2 py-0.5 rounded-full"
+                            className="inline-block whitespace-nowrap text-[10px] font-bold bg-zinc-200/70 dark:bg-[#27272A] text-zinc-600 dark:text-zinc-400 border border-[#E4E4E7] dark:border-[#27272A] px-2 py-0.5 rounded-full"
                           >
                             Exact duplicate
                           </span>
                         ) : dup.matchType === 'same_variant' ? (
                           <span
                             title={`Currently ${formatCurrency(dup.existingDrink.price, currency)} at this bar — importing will update it`}
-                            className="inline-block whitespace-nowrap text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full"
+                            className="inline-block whitespace-nowrap text-[10px] font-bold bg-[#FF8A8E]/25 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/50 px-2 py-0.5 rounded-full"
                           >
                             Updates price
                           </span>
                         ) : (
                           <span
                             title={`Exists at ${dup.existingDrink.volumeMl}ml in this bar`}
-                            className="inline-block whitespace-nowrap text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full"
+                            className="inline-block whitespace-nowrap text-[10px] font-bold bg-[#FF8A8E]/15 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40 px-2 py-0.5 rounded-full"
                           >
                             New size ({drink.volumeMl}ml)
                           </span>
@@ -885,7 +885,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className="w-full bg-stone-900 text-white font-mono rounded px-2 py-1 text-xs border border-stone-800 focus:border-amber-400"
+                          className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-medium rounded-lg px-2 py-1 text-xs border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
                         />
                       </td>
 
@@ -901,7 +901,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className="w-full bg-stone-900 text-white font-mono rounded px-2 py-1 text-xs border border-stone-800 focus:border-amber-400"
+                          className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-medium rounded-lg px-2 py-1 text-xs border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
                         />
                       </td>
 
@@ -917,11 +917,11 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className="w-full bg-stone-900 text-white font-mono rounded px-2 py-1 text-xs border border-stone-800 focus:border-amber-400"
+                          className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-medium rounded-lg px-2 py-1 text-xs border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
                         />
                       </td>
 
-                      <td className="p-2.5 text-right font-mono font-bold text-amber-400">
+                      <td className="p-2.5 text-right font-bold text-[#F21B2D] tabular-nums">
                         {metrics.pureAlcoholPerCurrency} ml/{currency}
                       </td>
                     </tr>
@@ -936,7 +936,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             type="button"
             onClick={handleImport}
             disabled={selectedIds.size === 0}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all disabled:opacity-40"
+            className="w-full py-3 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-extrabold tracking-[-0.01em] text-sm flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-40"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>

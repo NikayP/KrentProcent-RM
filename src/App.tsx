@@ -25,6 +25,7 @@ const STORAGE_KEY = 'krentprocent_rm_drinks_v2';
 const MANAGED_BARS_KEY = 'krentprocent_rm_bars_v2';
 const ACTIVE_BAR_KEY = 'krentprocent_rm_active_bar_v2';
 const TOUR_STORAGE_KEY = 'krentprocent_has_seen_tour_v1';
+const THEME_STORAGE_KEY = 'krentprocent_theme_v1';
 
 export default function App() {
   const [drinks, setDrinks] = useState<DrinkItem[]>(() => {
@@ -78,6 +79,31 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'calculator' | 'scanner' | 'bars'>(
     'calculator'
   );
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window === 'undefined') return 'light';
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'light' || saved === 'dark') return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', theme === 'dark');
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // ignore storage errors
+    }
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // In-app confirmation dialog state
   const [barPendingDelete, setBarPendingDelete] = useState<string | null>(null);
@@ -315,7 +341,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans selection:bg-amber-500 selection:text-stone-950">
+    <div className="min-h-screen bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] flex flex-col font-sans selection:bg-[#F21B2D] selection:text-white transition-colors duration-200">
       {/* Sticky Top Header with Venue Switcher */}
       <Header
         activeTab={activeTab}
@@ -329,13 +355,15 @@ export default function App() {
         onAddBar={handleAddBar}
         onRenameBar={handleRenameBar}
         onDeleteBar={handleDeleteBar}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="fixed top-16 right-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="bg-stone-900 border border-amber-500/50 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-400" />
+          <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#F21B2D]/40 text-[#18181B] dark:text-[#FFFFFF] text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+            <Check className="w-4 h-4 text-[#F21B2D]" />
             <span>{toastMessage}</span>
           </div>
         </div>
@@ -425,17 +453,17 @@ export default function App() {
       />
 
       {/* Footer & Fallback / Preset Restore Bar */}
-      <footer className="mt-auto border-t border-stone-800/80 bg-stone-900/60 py-6 text-xs text-stone-500">
+      <footer className="mt-auto border-t border-[#E4E4E7] dark:border-[#27272A] bg-[#FFFFFF]/80 dark:bg-[#18181B]/90 py-6 text-xs text-zinc-500 dark:text-zinc-400">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-stone-400">
+          <div className="flex items-center gap-3 text-zinc-600 dark:text-zinc-400">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-[#F21B2D]" />
               <span>KrentProcent RM &bull; Mathematical Alcohol Efficiency Engine</span>
             </div>
             <button
               type="button"
               onClick={handleLoadPresets}
-              className="text-[11px] text-amber-400 hover:text-amber-300 underline flex items-center gap-1"
+              className="text-[11px] text-[#F21B2D] hover:text-[#D91424] font-semibold underline flex items-center gap-1"
               title="Restore or merge standard preset bars and drinks"
             >
               <Sparkles className="w-3 h-3" />
@@ -443,8 +471,8 @@ export default function App() {
             </button>
           </div>
 
-          <div className="text-center sm:text-right text-stone-400 max-w-md flex items-center gap-1.5 justify-center sm:justify-end">
-            <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <div className="text-center sm:text-right text-zinc-600 dark:text-zinc-400 max-w-md flex items-center gap-1.5 justify-center sm:justify-end">
+            <Info className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
             <span>
               For informational and social calculation fun. Know your personal limits &amp; enjoy
               responsibly.

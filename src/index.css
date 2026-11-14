@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-stone-750: oklch(32.1% 0.0085 50.9);
-  --color-stone-850: oklch(24.2% 0.0065 45.2);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 @utility no-scrollbar {
@@ -15,9 +16,24 @@
 
 @layer base {
   html {
+    font-family: var(--font-sans);
+    color-scheme: light;
+    background-color: #FFF2F3;
+    color: #18181B;
+    scrollbar-color: #D4D4D8 #FFF2F3;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.dark {
     color-scheme: dark;
-    background-color: var(--color-stone-950);
-    scrollbar-color: var(--color-stone-700) var(--color-stone-950);
+    background-color: #121214;
+    color: #FFFFFF;
+    scrollbar-color: #27272A #121214;
+  }
+
+  body {
+    font-family: var(--font-sans);
   }
 
   button:not(:disabled),

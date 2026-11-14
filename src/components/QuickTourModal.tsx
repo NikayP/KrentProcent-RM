@@ -174,7 +174,7 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
       {/* Subtle backdrop overlay */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-stone-950/30 transition-opacity duration-200"
+        className="absolute inset-0 bg-black/35 transition-opacity duration-200"
       />
 
       {/* Spotlight highlight around active section */}
@@ -186,17 +186,17 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
             width: `${Math.min(window.innerWidth - 8, targetRect.width + 8)}px`,
             height: `${targetRect.height + 8}px`,
           }}
-          className="fixed pointer-events-none rounded-xl border-2 border-amber-400 shadow-[0_0_0_3px_rgba(245,158,11,0.25),0_0_20px_rgba(245,158,11,0.35)] transition-all duration-200 z-40 animate-pulse"
+          className="fixed pointer-events-none rounded-xl border-2 border-[#F21B2D] shadow-[0_0_0_3px_rgba(242,27,45,0.22),0_0_20px_rgba(242,27,45,0.3)] transition-all duration-200 z-40 animate-pulse"
         />
       )}
 
       {/* Floating Tour Card - compact on mobile */}
       <div className="fixed bottom-2.5 sm:bottom-5 left-1/2 -translate-x-1/2 w-full max-w-lg px-3 sm:px-4 z-50">
-        <div className="bg-stone-900 border border-amber-500/50 rounded-2xl p-3 sm:p-5 shadow-2xl relative text-stone-100 space-y-2 sm:space-y-3">
+        <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#F21B2D]/40 rounded-2xl p-3 sm:p-5 shadow-2xl relative text-[#18181B] dark:text-[#FFFFFF] space-y-2 sm:space-y-3">
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 text-stone-400 hover:text-white p-1 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+            className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 text-zinc-400 hover:text-[#18181B] dark:hover:text-white p-1 rounded-xl hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] transition-colors cursor-pointer"
             title="Close tour"
             aria-label="Close tour"
           >
@@ -205,32 +205,32 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
 
           {/* Header with Icon & Badge */}
           <div className="flex items-center gap-2 sm:gap-3 pr-6">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/40 shadow-sm">
-              <StepIcon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#FF8A8E]/20 text-[#F21B2D] flex items-center justify-center shrink-0 border border-[#FF8A8E]/40 shadow-sm">
+              <StepIcon className="w-4 h-4 sm:w-5 sm:h-5 text-[#F21B2D]" />
             </div>
             <div className="min-w-0">
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-1.5 sm:px-2 py-0.5 rounded-full border border-amber-500/20">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#D91424] dark:text-[#FF8A8E] bg-[#FF8A8E]/20 px-1.5 sm:px-2 py-0.5 rounded-full border border-[#FF8A8E]/40">
                 {step.badge}
               </span>
-              <h3 className="text-xs sm:text-base font-black text-white mt-0.5 truncate">
+              <h3 className="text-xs sm:text-base font-extrabold tracking-[-0.02em] text-[#18181B] dark:text-[#FFFFFF] mt-0.5 truncate">
                 {step.title}
               </h3>
             </div>
           </div>
 
           {/* Description */}
-          <p className="text-[11px] sm:text-sm text-stone-300 leading-snug sm:leading-relaxed">
+          <p className="text-[11px] sm:text-sm text-zinc-600 dark:text-zinc-300 leading-snug sm:leading-relaxed">
             {step.description}
           </p>
 
           {/* Action Tip */}
-          <div className="bg-stone-950 p-2 sm:p-2.5 rounded-xl border border-stone-800 text-[11px] sm:text-xs text-amber-300 font-medium flex items-start gap-1.5 sm:gap-2">
-            <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="bg-[#FFF2F3] dark:bg-[#121214] p-2 sm:p-2.5 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] text-[11px] sm:text-xs text-[#D91424] dark:text-[#FF8A8E] font-medium flex items-start gap-1.5 sm:gap-2">
+            <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#F21B2D] shrink-0 mt-0.5" />
             <span className="leading-tight sm:leading-normal">{step.actionTip}</span>
           </div>
 
           {/* Navigation Bar */}
-          <div className="flex items-center justify-between pt-1 border-t border-stone-800/80">
+          <div className="flex items-center justify-between pt-1 border-t border-[#E4E4E7] dark:border-[#27272A]">
             {/* Progress Dots */}
             <div className="flex items-center gap-1.5">
               {TOUR_STEPS.map((_, idx) => (
@@ -238,7 +238,7 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
                   key={idx}
                   onClick={() => setCurrentStep(idx)}
                   className={`h-1.5 rounded-full transition-all cursor-pointer ${
-                    idx === currentStep ? 'w-4 sm:w-5 bg-amber-400' : 'w-1.5 bg-stone-700 hover:bg-stone-600'
+                    idx === currentStep ? 'w-4 sm:w-5 bg-[#F21B2D]' : 'w-1.5 bg-zinc-300 dark:bg-[#27272A] hover:bg-[#FF8A8E]'
                   }`}
                   aria-label={`Go to step ${idx + 1}`}
                 />
@@ -250,7 +250,7 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
               {currentStep > 0 && (
                 <button
                   onClick={handlePrev}
-                  className="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold rounded-xl text-zinc-600 dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Back</span>
@@ -259,7 +259,7 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
 
               <button
                 onClick={handleNext}
-                className="px-3.5 sm:px-4 py-1 sm:py-2 text-xs font-black rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 transition-all shadow-lg shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+                className="px-3.5 sm:px-4 py-1 sm:py-2 text-xs font-extrabold tracking-[-0.01em] rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 {isLast ? (
                   <>

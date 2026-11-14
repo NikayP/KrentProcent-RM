@@ -2,17 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Check,
-  Beer,
-  Wine,
-  Flame,
-  GlassWater,
-  Apple,
-  HelpCircle,
   Store,
   AlertTriangle,
   RefreshCw,
   Copy,
 } from 'lucide-react';
+import { DRINK_CATEGORY_LIST, CategoryIcon } from './CategoryIcon';
 import {
   DrinkCategory,
   DrinkItem,
@@ -187,35 +182,26 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
   const abvChips = [4.5, 5.0, 5.5, 6.5, 8.0, 8.5, 10.0, 12.5, 40.0];
 
-  const categories: { id: DrinkCategory; label: string; icon: any }[] = [
-    { id: 'beer', label: 'Beer', icon: Beer },
-    { id: 'wine', label: 'Wine', icon: Wine },
-    { id: 'spirit', label: 'Spirit', icon: Flame },
-    { id: 'cocktail', label: 'Cocktail', icon: GlassWater },
-    { id: 'cider', label: 'Cider', icon: Apple },
-    { id: 'other', label: 'Other', icon: HelpCircle },
-  ];
-
   return (
-    <div className="bg-stone-900 border border-stone-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
-      {/* Background ambient glow */}
-      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+    <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 sm:p-6 shadow-sm relative overflow-hidden">
+      {/* Background ambient glow matching inspiration card aesthetic */}
+      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#FF8A8E]/15 dark:bg-[#F21B2D]/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header & Quick Bar Presets */}
       <div id="tour-drink-presets" className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 mb-4">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+          <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF] flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#F21B2D] animate-pulse" />
             Add Drink to Compare
           </h2>
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
             Compare pure alcohol vs price for your current bar. Duplicates per bar are automatically detected.
           </p>
         </div>
 
         {/* 1-tap presets bar */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-stone-400 uppercase tracking-wider whitespace-nowrap mr-1">
+          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap mr-1">
             Templates:
           </span>
           {[
@@ -230,7 +216,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               key={preset.id}
               type="button"
               onClick={() => applyPreset(preset, true)}
-              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-stone-800 hover:bg-amber-500/20 hover:text-amber-300 text-stone-300 border border-stone-700/80 transition-colors whitespace-nowrap"
+              className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/25 dark:hover:bg-[#FF8A8E]/20 hover:text-[#D91424] dark:hover:text-[#FF8A8E] text-[#18181B] dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A] transition-colors whitespace-nowrap"
             >
               {label}
             </button>
@@ -240,19 +226,19 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* BAR NAME & VENUE ROW */}
-        <div className="bg-stone-950/80 p-3 rounded-xl border border-stone-800 space-y-2">
+        <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <label
               htmlFor="bar-name-input"
-              className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5 shrink-0"
+              className="text-xs font-bold text-[#F21B2D] uppercase tracking-wider flex items-center gap-1.5 shrink-0"
             >
-              <Store className="w-3.5 h-3.5 text-amber-400" />
+              <Store className="w-3.5 h-3.5 text-[#F21B2D]" />
               <span>Which Bar are you sitting at? *</span>
             </label>
 
             {availableBars.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] text-stone-500 uppercase mr-1">Known Bars:</span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase mr-1">Known Bars:</span>
                 {availableBars.slice(0, 4).map((b) => (
                   <button
                     key={b}
@@ -261,10 +247,10 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                       setBarName(b);
                       onSelectBar(b);
                     }}
-                    className={`text-[10px] px-2 py-0.5 rounded font-medium border transition-colors whitespace-nowrap ${
+                    className={`text-[10px] px-2.5 py-0.5 rounded-lg font-medium border transition-colors whitespace-nowrap ${
                       areBarNamesEquivalent(barName, b)
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 font-bold'
-                        : 'bg-stone-900 text-stone-400 border-stone-800 hover:text-stone-200'
+                        ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white border-[#F21B2D] font-bold'
+                        : 'bg-[#FFFFFF] dark:bg-[#18181B] text-zinc-600 dark:text-zinc-400 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
                     }`}
                   >
                     {b}
@@ -280,7 +266,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                       }
                     }}
                     aria-label="All known bars"
-                    className="text-[10px] px-2 py-0.5 rounded bg-stone-900 text-amber-300 border border-stone-700 font-semibold focus:outline-none focus:border-amber-400"
+                    className="text-[10px] px-2 py-0.5 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] text-[#F21B2D] border border-[#E4E4E7] dark:border-[#27272A] font-semibold focus:outline-none focus:border-[#F21B2D]"
                   >
                     <option value="">+{availableBars.length - 4} more bars...</option>
                     {availableBars.map((b) => (
@@ -303,7 +289,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               onChange={(e) => setBarName(e.target.value)}
               placeholder="e.g. Café De Dokter, Gollem, The Waterhole..."
               required
-              className="w-full bg-stone-900 text-white font-medium text-xs sm:text-sm rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400 placeholder:text-stone-600"
+              className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] font-medium text-xs sm:text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
             <datalist id="known-bars-datalist">
               {availableBars.map((b) => (
@@ -315,8 +301,8 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           {/* Quick-copy drinks known from other bars */}
           {otherBarSuggestions.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[10px] text-stone-400 flex items-center gap-1 shrink-0">
-                <Copy className="w-3 h-3 text-amber-400" />
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1 shrink-0">
+                <Copy className="w-3 h-3 text-[#F21B2D]" />
                 <span>From other bars (adjust price):</span>
               </span>
               {otherBarSuggestions.map((item) => (
@@ -325,7 +311,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                   type="button"
                   onClick={() => applyPreset(item, true)}
                   title={`Copy ${item.name} (${item.volumeMl}ml, ${item.abv}%) from ${item.barName} to ${resolvedBarName}`}
-                  className="text-[10px] px-2 py-0.5 rounded bg-stone-900 hover:bg-amber-500/15 text-stone-300 hover:text-amber-300 border border-stone-800 hover:border-amber-500/40 transition-colors whitespace-nowrap"
+                  className="text-[10px] px-2 py-0.5 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-zinc-700 dark:text-zinc-300 hover:text-[#D91424] dark:hover:text-[#FF8A8E] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#FF8A8E] transition-colors whitespace-nowrap"
                 >
                   + {item.name} ({item.volumeMl}ml)
                 </button>
@@ -339,7 +325,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           <div className="md:col-span-5">
             <label
               htmlFor="drink-name"
-              className="block text-xs font-semibold text-stone-300 uppercase tracking-wider mb-1.5"
+              className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5"
             >
               Drink Name / Label *
             </label>
@@ -350,14 +336,14 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Heineken Vaasje, Tripel Karmeliet..."
               required
-              className="w-full bg-stone-950 text-white rounded-xl px-3.5 py-2.5 text-sm border border-stone-700 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all placeholder:text-stone-600"
+              className="w-full bg-[#FFFFFF] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-3.5 py-2.5 text-sm border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] focus:ring-1 focus:ring-[#F21B2D] transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
           </div>
 
           <div className="md:col-span-2">
             <label
               htmlFor="drink-notes"
-              className="block text-xs font-semibold text-stone-300 uppercase tracking-wider mb-1.5"
+              className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5"
             >
               Notes (Opt.)
             </label>
@@ -367,30 +353,33 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Draft, Bottle"
-              className="w-full bg-stone-950 text-white rounded-xl px-3 py-2.5 text-sm border border-stone-700 focus:outline-none focus:border-amber-400 transition-all placeholder:text-stone-600"
+              className="w-full bg-[#FFFFFF] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-3 py-2.5 text-sm border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
           </div>
 
           <div className="md:col-span-5">
-            <label className="block text-xs font-semibold text-stone-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
               Category
             </label>
             <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-3 gap-1.5">
-              {categories.map((cat) => {
-                const Icon = cat.icon;
+              {DRINK_CATEGORY_LIST.map((cat) => {
                 const isSelected = category === cat.id;
                 return (
                   <button
                     key={cat.id}
                     type="button"
                     onClick={() => setCategory(cat.id)}
-                    className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-xl text-[11px] font-semibold transition-all border ${
+                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-[11px] font-semibold transition-all border ${
                       isSelected
-                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-sm'
-                        : 'bg-stone-950/60 border-stone-800 text-stone-400 hover:text-stone-200 hover:bg-stone-800'
+                        ? 'bg-[#F21B2D] hover:bg-[#D91424] border-[#F21B2D] text-white shadow-sm'
+                        : 'bg-[#FFF2F3]/50 dark:bg-[#121214] border-[#E4E4E7] dark:border-[#27272A] text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-[#FF8A8E]/15 dark:hover:bg-[#27272A]'
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                    <CategoryIcon
+                      category={cat.id}
+                      className="w-3.5 h-3.5"
+                      colored={!isSelected}
+                    />
                     <span className="truncate">{cat.label}</span>
                   </button>
                 );
@@ -403,15 +392,13 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
         {duplicateCheck && (
           <div
             className={`p-3 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-              duplicateCheck.matchType === 'exact'
-                ? 'bg-amber-950/50 border-amber-500/50 text-amber-200'
-                : duplicateCheck.matchType === 'same_variant'
-                ? 'bg-amber-950/40 border-amber-400/40 text-amber-200'
-                : 'bg-stone-950/80 border-stone-700 text-stone-300'
+              duplicateCheck.matchType === 'exact' || duplicateCheck.matchType === 'same_variant'
+                ? 'bg-[#FF8A8E]/15 dark:bg-[#F21B2D]/10 border-[#FF8A8E]/50 dark:border-[#F21B2D]/40 text-[#18181B] dark:text-zinc-100'
+                : 'bg-[#FFF2F3]/60 dark:bg-[#121214] border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-zinc-300'
             }`}
           >
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-[#F21B2D] shrink-0 mt-0.5" />
               <div>
                 {duplicateCheck.matchType === 'exact' && (
                   <span>
@@ -450,7 +437,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 <button
                   type="button"
                   onClick={() => submitWithMode('force_add')}
-                  className="px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-stone-800 text-stone-300 border border-stone-700 text-[11px] font-semibold transition-colors whitespace-nowrap"
+                  className="px-2.5 py-1.5 rounded-xl bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-zinc-50 dark:hover:bg-[#27272A] text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] text-[11px] font-semibold transition-colors whitespace-nowrap"
                 >
                   Add as Separate Item Anyway
                 </button>
@@ -462,12 +449,12 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
         {/* 3 Core Numeric Inputs: Volume, ABV, Price */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Volume */}
-          <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800">
+          <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A]">
             <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="drink-volume" className="text-xs font-semibold text-stone-300">
+              <label htmlFor="drink-volume" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Volume (ml) *
               </label>
-              <span className="text-[11px] text-amber-400 font-mono font-bold">
+              <span className="text-[11px] text-[#F21B2D] tabular-nums font-bold">
                 {volumeMl ? `${(volumeMl / 10).toFixed(0)} cl` : '0 cl'}
               </span>
             </div>
@@ -481,9 +468,9 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 value={volumeMl || ''}
                 onChange={(e) => setVolumeMl(parseFloat(e.target.value) || 0)}
                 required
-                className="w-full bg-stone-900 text-white font-mono font-bold text-base rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400"
+                className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-extrabold tracking-[-0.02em] text-base rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
               />
-              <span className="text-xs font-bold text-stone-400">ml</span>
+              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">ml</span>
             </div>
 
             {/* Quick volume chips */}
@@ -493,10 +480,10 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                   key={chip.val}
                   type="button"
                   onClick={() => setVolumeMl(chip.val)}
-                  className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
+                  className={`text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors ${
                     volumeMl === chip.val
-                      ? 'bg-amber-500 text-stone-950 font-bold'
-                      : 'bg-stone-850 hover:bg-stone-800 text-stone-300 border border-stone-700/50'
+                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold'
+                      : 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]'
                   }`}
                 >
                   {chip.label}
@@ -506,12 +493,12 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           </div>
 
           {/* ABV % */}
-          <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800">
+          <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A]">
             <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="drink-abv" className="text-xs font-semibold text-stone-300">
+              <label htmlFor="drink-abv" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 ABV (%) *
               </label>
-              <span className="text-[11px] text-amber-400 font-mono font-bold">
+              <span className="text-[11px] text-[#F21B2D] tabular-nums font-bold">
                 {abv ? `${abv.toFixed(1)}%` : '0%'}
               </span>
             </div>
@@ -525,9 +512,9 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 value={abv || ''}
                 onChange={(e) => setAbv(parseFloat(e.target.value) || 0)}
                 required
-                className="w-full bg-stone-900 text-white font-mono font-bold text-base rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400"
+                className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-extrabold tracking-[-0.02em] text-base rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
               />
-              <span className="text-xs font-bold text-stone-400">%</span>
+              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">%</span>
             </div>
 
             {/* Quick ABV chips */}
@@ -537,10 +524,10 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                   key={chip}
                   type="button"
                   onClick={() => setAbv(chip)}
-                  className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
+                  className={`text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors ${
                     abv === chip
-                      ? 'bg-amber-500 text-stone-950 font-bold'
-                      : 'bg-stone-850 hover:bg-stone-800 text-stone-300 border border-stone-700/50'
+                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold'
+                      : 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]'
                   }`}
                 >
                   {chip}%
@@ -550,16 +537,16 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           </div>
 
           {/* Price */}
-          <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800">
+          <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A]">
             <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="drink-price" className="text-xs font-semibold text-stone-300">
+              <label htmlFor="drink-price" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Price ({currency}) *
               </label>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setPrice((p) => Math.max(0.5, Number((p - 0.5).toFixed(2))))}
-                  className="px-1.5 py-0.5 text-[10px] rounded bg-stone-800 hover:bg-stone-700 text-stone-300"
+                  className="px-1.5 py-0.5 text-[10px] rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-zinc-700 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]"
                   title="Minus 0.50"
                 >
                   -0.50
@@ -567,7 +554,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setPrice((p) => Number((p + 0.5).toFixed(2)))}
-                  className="px-1.5 py-0.5 text-[10px] rounded bg-stone-800 hover:bg-stone-700 text-stone-300"
+                  className="px-1.5 py-0.5 text-[10px] rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-zinc-700 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]"
                   title="Plus 0.50"
                 >
                   +0.50
@@ -575,7 +562,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-amber-400">{currency}</span>
+              <span className="text-xs font-bold text-[#F21B2D]">{currency}</span>
               <input
                 id="drink-price"
                 type="number"
@@ -585,7 +572,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 value={price || ''}
                 onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
                 required
-                className="w-full bg-stone-900 text-white font-mono font-bold text-base rounded-lg px-3 py-2 border border-stone-700 focus:outline-none focus:border-amber-400"
+                className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-extrabold tracking-[-0.02em] text-base rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
               />
             </div>
 
@@ -596,10 +583,10 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                   key={pVal}
                   type="button"
                   onClick={() => setPrice(pVal)}
-                  className={`text-[10px] px-2 py-0.5 rounded font-medium transition-colors ${
+                  className={`text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors ${
                     price === pVal
-                      ? 'bg-amber-500 text-stone-950 font-bold'
-                      : 'bg-stone-850 hover:bg-stone-800 text-stone-300 border border-stone-700/50'
+                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold'
+                      : 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]'
                   }`}
                 >
                   {formatCurrency(pVal, currency)}
@@ -610,29 +597,29 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
         </div>
 
         {/* Live Calculation Preview Banner & Add/Update Button */}
-        <div className="bg-gradient-to-r from-stone-950 via-stone-900 to-stone-950 rounded-xl p-3 border border-amber-900/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="bg-gradient-to-r from-[#FFF2F3] via-[#FFFFFF] to-[#FFF2F3] dark:from-[#121214] dark:via-[#18181B] dark:to-[#121214] rounded-xl p-3 border border-[#E4E4E7] dark:border-[#27272A] flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
             <div className="flex items-center gap-1.5">
-              <span className="text-stone-400 font-medium">Pure Alcohol:</span>
-              <span className="text-amber-300 font-mono font-bold text-sm">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Pure Alcohol:</span>
+              <span className="text-[#18181B] dark:text-[#FFFFFF] font-bold text-sm tabular-nums tracking-[-0.01em]">
                 {preview.pureAlcoholMl} ml ({preview.standardDrinks} std)
               </span>
             </div>
 
-            <div className="h-4 w-px bg-stone-700" />
+            <div className="h-4 w-px bg-[#E4E4E7] dark:bg-[#27272A]" />
 
             <div className="flex items-center gap-1.5">
-              <span className="text-stone-400 font-medium">KrentProcent:</span>
-              <span className="text-emerald-400 font-mono font-black text-sm">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium">KrentProcent:</span>
+              <span className="text-[#F21B2D] font-extrabold text-sm tabular-nums tracking-[-0.02em]">
                 {preview.pureAlcoholPerCurrency} ml / {currency}
               </span>
             </div>
 
-            <div className="h-4 w-px bg-stone-700 hidden sm:block" />
+            <div className="h-4 w-px bg-[#E4E4E7] dark:bg-[#27272A] hidden sm:block" />
 
             <div className="hidden sm:flex items-center gap-1.5">
-              <span className="text-stone-400 font-medium">Cost / Std Drink:</span>
-              <span className="text-stone-200 font-mono font-bold">
+              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Cost / Std Drink:</span>
+              <span className="text-[#18181B] dark:text-zinc-200 font-bold tabular-nums">
                 {formatCurrency(preview.costPerStandardDrink, currency)}
               </span>
             </div>
@@ -640,14 +627,10 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
           <button
             type="submit"
-            className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg ${
+            className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
               justAddedMessage
-                ? 'bg-emerald-500 text-stone-950 shadow-emerald-500/20'
-                : duplicateCheck &&
-                  (duplicateCheck.matchType === 'exact' ||
-                    duplicateCheck.matchType === 'same_variant')
-                ? 'bg-amber-400 hover:bg-amber-300 text-stone-950 shadow-amber-500/20'
-                : 'bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-stone-950 shadow-amber-500/20'
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                : 'bg-[#F21B2D] hover:bg-[#D91424] text-white'
             }`}
           >
             {justAddedMessage ? (

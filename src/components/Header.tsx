@@ -13,8 +13,11 @@ import {
   Search,
   Globe,
   MapPin,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { DrinkItem, filterDrinksByBar, normalizeBarKey, DEFAULT_BAR_NAME } from '../utils/calculator';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   activeTab: 'calculator' | 'scanner' | 'bars';
@@ -28,6 +31,8 @@ interface HeaderProps {
   onAddBar?: (barName: string) => void;
   onRenameBar?: (oldName: string, newName: string) => void;
   onDeleteBar?: (bar: string) => void;
+  theme?: 'light' | 'dark';
+  onToggleTheme?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,6 +47,8 @@ export const Header: React.FC<HeaderProps> = ({
   onAddBar,
   onRenameBar,
   onDeleteBar,
+  theme = 'light',
+  onToggleTheme,
 }) => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [barSearchQuery, setBarSearchQuery] = useState('');
@@ -175,36 +182,35 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-stone-900/95 backdrop-blur-md border-b border-amber-900/40 text-stone-100 shadow-xl">
-      <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 sm:px-6 space-y-2">
-        {/* Top Row: Brand & Currency/Reset */}
+    <header className="sticky top-0 z-40 bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 backdrop-blur-md border-b border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FFFFFF] shadow-sm transition-colors duration-200">
+      <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 sm:px-6 space-y-2.5">
+        {/* Top Row: Brand & Theme/Reset Controls */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20 text-stone-950 font-black text-xl shrink-0">
-              <Beer className="w-5 h-5 sm:w-6 sm:h-6 text-stone-950" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg sm:text-2xl font-black tracking-tight text-white flex items-center gap-1.5 whitespace-nowrap">
-                  KrentProcent{' '}
-                  <span className="text-amber-400 text-[11px] sm:text-xs px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/30 shrink-0">
-                    RM
-                  </span>
-                </h1>
-              </div>
-              <p className="hidden xs:block text-[11px] sm:text-xs text-stone-400 font-medium truncate">
-                Most pure alcohol per coin at the bar &bull; Compare by venue &amp; menu
-              </p>
-            </div>
-          </div>
+          <BrandLogo />
 
           {/* Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                className="p-1.5 sm:p-2 text-zinc-600 dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A] rounded-xl transition-colors border border-[#E4E4E7] dark:border-[#27272A]"
+                aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-[#FF8A8E]" />
+                ) : (
+                  <Moon className="w-4 h-4 text-[#18181B]" />
+                )}
+              </button>
+            )}
+
             {(drinkCount > 0 || availableBars.length > 0) && (
               <button
                 onClick={onReset}
                 title="Reset all drinks and bars"
-                className="p-1.5 sm:p-2 text-stone-400 hover:text-rose-400 hover:bg-stone-800 rounded-lg transition-colors border border-stone-800"
+                className="p-1.5 sm:p-2 text-zinc-500 dark:text-zinc-400 hover:text-[#F21B2D] dark:hover:text-[#FF8A8E] bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A] rounded-xl transition-colors border border-[#E4E4E7] dark:border-[#27272A]"
                 aria-label="Clear all drinks"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -215,14 +221,14 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs Row */}
         <div>
-          <nav className="grid grid-cols-3 gap-1.5 bg-stone-950/80 p-1 rounded-xl border border-stone-800 text-xs font-semibold">
+          <nav className="grid grid-cols-3 gap-1.5 bg-[#FFF2F3] dark:bg-[#121214] p-1 rounded-2xl border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold">
             {/* 1. Left: Drinks Calculator */}
             <button
               onClick={() => setActiveTab('calculator')}
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap min-w-0 ${
+              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'calculator'
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+                  ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white shadow-sm font-bold'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-white/80 dark:hover:bg-[#18181B]'
               }`}
             >
               <Beer className="w-4 h-4 shrink-0" />
@@ -233,10 +239,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="tour-nav-scanner"
               onClick={() => setActiveTab('scanner')}
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg transition-all whitespace-nowrap min-w-0 ${
+              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'scanner'
-                  ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-stone-950 shadow-lg shadow-amber-500/25 font-black ring-1 ring-amber-300'
-                  : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:border-amber-400 font-bold shadow-sm'
+                  ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white shadow-sm font-bold'
+                  : 'bg-[#FF8A8E]/15 hover:bg-[#FF8A8E]/25 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40 font-bold'
               }`}
             >
               <Camera className="w-4 h-4 shrink-0" />
@@ -246,10 +252,10 @@ export const Header: React.FC<HeaderProps> = ({
             {/* 3. Right: Compare Bars */}
             <button
               onClick={() => setActiveTab('bars')}
-              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all whitespace-nowrap min-w-0 ${
+              className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'bars'
-                  ? 'bg-amber-500 text-stone-950 shadow-md font-bold'
-                  : 'text-stone-400 hover:text-stone-200 hover:bg-stone-850'
+                  ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white shadow-sm font-bold'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-white/80 dark:hover:bg-[#18181B]'
               }`}
             >
               <Store className="w-4 h-4 shrink-0" />
@@ -262,12 +268,12 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* COMPACT VENUE SCOPE SUB-BAR: Always 1 single row, scalable to 50+ bars */}
-      <div className="bg-stone-950 border-t border-stone-850 px-4 py-1.5 sm:px-6">
+      <div className="bg-[#FFF2F3]/80 dark:bg-[#121214] border-t border-[#E4E4E7] dark:border-[#27272A] px-4 py-1.5 sm:px-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 text-xs">
           {/* Left: Sitting At Selector + Quick Desktop Pills */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-stone-400 font-semibold flex items-center gap-1 shrink-0">
-              <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-zinc-500 dark:text-zinc-400 font-semibold flex items-center gap-1 shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
               <span className="hidden xs:inline">Sitting At:</span>
             </span>
 
@@ -280,19 +286,19 @@ export const Header: React.FC<HeaderProps> = ({
                   setIsRenamingBar(false);
                   setIsAddingBar(false);
                 }}
-                className={`w-full flex items-center justify-between gap-2 px-2.5 py-1 rounded-lg font-bold transition-all border text-left ${
+                className={`w-full flex items-center justify-between gap-2 px-2.5 py-1 rounded-xl font-bold transition-all border text-left ${
                   activeBar === 'all'
-                    ? 'bg-stone-900 hover:bg-stone-850 text-white border-stone-750'
-                    : 'bg-amber-400 hover:bg-amber-300 text-stone-950 border-amber-300 shadow-sm'
+                    ? 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-zinc-50 dark:hover:bg-[#27272A] text-[#18181B] dark:text-white border-[#E4E4E7] dark:border-[#27272A]'
+                    : 'bg-[#F21B2D] hover:bg-[#D91424] text-white border-[#F21B2D] shadow-sm'
                 }`}
                 aria-expanded={isPickerOpen}
                 aria-haspopup="listbox"
               >
                 <span className="flex items-center gap-1.5 min-w-0 truncate">
                   {activeBar === 'all' ? (
-                    <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <Globe className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
                   ) : (
-                    <Store className="w-3.5 h-3.5 text-stone-950 shrink-0" />
+                    <Store className="w-3.5 h-3.5 text-white shrink-0" />
                   )}
                   <span className="truncate">
                     {activeBar === 'all' ? 'All Bars' : activeBar}
@@ -301,10 +307,10 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <span className="flex items-center gap-1 shrink-0">
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 leading-none rounded-full font-mono ${
+                    className={`text-[10px] px-1.5 py-0.5 leading-none rounded-full tabular-nums ${
                       activeBar === 'all'
-                        ? 'bg-stone-800 text-amber-300'
-                        : 'bg-stone-950/20 text-stone-950 font-black'
+                        ? 'bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] font-bold'
+                        : 'bg-white/20 text-white font-bold'
                     }`}
                   >
                     {activeBarDrinkCount}
@@ -312,18 +318,18 @@ export const Header: React.FC<HeaderProps> = ({
                   <ChevronDown
                     className={`w-3.5 h-3.5 transition-transform duration-150 ${
                       isPickerOpen ? 'rotate-180' : ''
-                    } ${activeBar === 'all' ? 'text-stone-400' : 'text-stone-950'}`}
+                    } ${activeBar === 'all' ? 'text-zinc-500 dark:text-zinc-400' : 'text-white'}`}
                   />
                 </span>
               </button>
 
               {/* Dropdown Menu */}
               {isPickerOpen && (
-                <div className="absolute left-0 mt-1.5 w-72 sm:w-80 bg-stone-900 border border-stone-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute left-0 mt-1.5 w-72 sm:w-80 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                   {/* Search / Quick Add Input */}
-                  <div className="p-2 border-b border-stone-800 bg-stone-950/60">
+                  <div className="p-2 border-b border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/60 dark:bg-[#121214]">
                     <div className="relative flex items-center">
-                      <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 pointer-events-none" />
+                      <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
                       <input
                         ref={searchInputRef}
                         type="text"
@@ -342,13 +348,13 @@ export const Header: React.FC<HeaderProps> = ({
                           }
                         }}
                         placeholder={`Search ${availableBars.length} bars or type new...`}
-                        className="w-full bg-stone-900 text-white text-xs rounded-lg pl-8 pr-7 py-1.5 border border-stone-750 focus:outline-none focus:border-amber-400 placeholder:text-stone-500"
+                        className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-white text-xs rounded-xl pl-8 pr-7 py-1.5 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
                       />
                       {barSearchQuery && (
                         <button
                           type="button"
                           onClick={() => setBarSearchQuery('')}
-                          className="absolute right-2 text-stone-400 hover:text-white"
+                          className="absolute right-2 text-zinc-400 hover:text-[#18181B] dark:hover:text-white"
                           aria-label="Clear search"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -358,7 +364,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
 
                   {/* Bar List */}
-                  <div className="max-h-60 overflow-y-auto divide-y divide-stone-800/50">
+                  <div className="max-h-60 overflow-y-auto divide-y divide-[#E4E4E7]/60 dark:divide-[#27272A]/60">
                     {/* All Bars Global Option */}
                     {!barSearchQuery.trim() && (
                       <button
@@ -370,15 +376,15 @@ export const Header: React.FC<HeaderProps> = ({
                         }}
                         className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors ${
                           activeBar === 'all'
-                            ? 'bg-amber-500/15 text-amber-300 font-bold'
-                            : 'text-stone-200 hover:bg-stone-800'
+                            ? 'bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] font-bold'
+                            : 'text-[#18181B] dark:text-zinc-200 hover:bg-[#FFF2F3] dark:hover:bg-[#27272A]/60'
                         }`}
                       >
                         <span className="flex items-center gap-2 truncate">
-                          <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <Globe className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
                           <span>All Bars (Compare Global)</span>
                         </span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-stone-800 text-stone-300">
+                        <span className="text-[10px] tabular-nums font-semibold px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-[#27272A] text-zinc-600 dark:text-zinc-300">
                           {drinkCount} drinks
                         </span>
                       </button>
@@ -399,23 +405,23 @@ export const Header: React.FC<HeaderProps> = ({
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-colors text-left ${
                             isSelected
-                              ? 'bg-amber-500/20 text-amber-300 font-bold'
-                              : 'text-stone-200 hover:bg-stone-800'
+                              ? 'bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] font-bold'
+                              : 'text-[#18181B] dark:text-zinc-200 hover:bg-[#FFF2F3] dark:hover:bg-[#27272A]/60'
                           }`}
                         >
                           <span className="flex items-center gap-2 min-w-0 truncate">
                             <Store
                               className={`w-3.5 h-3.5 shrink-0 ${
-                                isSelected ? 'text-amber-400' : 'text-stone-400'
+                                isSelected ? 'text-[#F21B2D]' : 'text-zinc-400'
                               }`}
                             />
                             <span className="truncate">{bar}</span>
                           </span>
                           <span
-                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full shrink-0 ml-2 ${
+                            className={`text-[10px] tabular-nums px-1.5 py-0.5 rounded-full shrink-0 ml-2 ${
                               isSelected
-                                ? 'bg-amber-400 text-stone-950 font-black'
-                                : 'bg-stone-800 text-stone-400'
+                                ? 'bg-[#F21B2D] text-white font-bold'
+                                : 'bg-zinc-100 dark:bg-[#27272A] text-zinc-600 dark:text-zinc-400 font-semibold'
                             }`}
                           >
                             {count}
@@ -425,19 +431,19 @@ export const Header: React.FC<HeaderProps> = ({
                     })}
 
                     {filteredBars.length === 0 && !canCreateFromSearch && (
-                      <div className="px-3 py-4 text-center text-stone-500 text-xs">
+                      <div className="px-3 py-4 text-center text-zinc-500 dark:text-zinc-400 text-xs">
                         No bars found.
                       </div>
                     )}
                   </div>
 
                   {/* Create New Bar from Search or Footer Button */}
-                  <div className="p-2 border-t border-stone-800 bg-stone-950/80">
+                  <div className="p-2 border-t border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/60 dark:bg-[#121214]">
                     {canCreateFromSearch ? (
                       <button
                         type="button"
                         onClick={handleCreateFromSearch}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold text-xs transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span className="truncate">Create &amp; Sit at "{barSearchQuery.trim()}"</span>
@@ -450,7 +456,7 @@ export const Header: React.FC<HeaderProps> = ({
                           setIsAddingBar(true);
                           setIsRenamingBar(false);
                         }}
-                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-750 text-amber-300 font-semibold text-xs border border-stone-700 transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-[#F21B2D] font-semibold text-xs border border-[#E4E4E7] dark:border-[#27272A] transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add New Bar Venue</span>
@@ -467,9 +473,9 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={() => onSelectBar('all')}
                 title="Switch back to viewing all bars"
-                className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-white border border-stone-800 transition-colors whitespace-nowrap shrink-0 flex items-center gap-1"
+                className="px-2 py-1 rounded-xl text-[11px] font-semibold bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-zinc-50 dark:hover:bg-[#27272A] text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] transition-colors whitespace-nowrap shrink-0 flex items-center gap-1"
               >
-                <Globe className="w-3 h-3 text-amber-400" />
+                <Globe className="w-3 h-3 text-[#F21B2D]" />
                 <span className="hidden sm:inline">All Bars</span>
               </button>
             )}
@@ -485,7 +491,7 @@ export const Header: React.FC<HeaderProps> = ({
                       key={bar}
                       type="button"
                       onClick={() => onSelectBar(bar)}
-                      className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-stone-900/70 hover:bg-stone-800 text-stone-400 hover:text-stone-200 border border-stone-800/80 transition-colors whitespace-nowrap truncate max-w-[140px]"
+                      className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white border border-[#E4E4E7] dark:border-[#27272A] transition-colors whitespace-nowrap truncate max-w-[140px]"
                       title={`Quick switch to ${bar} (${barCounts.get(bar) || 0} drinks)`}
                     >
                       {bar} <span className="text-[10px] opacity-60">({barCounts.get(bar) || 0})</span>
@@ -509,11 +515,11 @@ export const Header: React.FC<HeaderProps> = ({
                   }}
                   placeholder="New bar name..."
                   autoFocus
-                  className="bg-stone-900 text-white text-xs rounded-lg px-2.5 py-1 border border-amber-400 focus:outline-none w-32 sm:w-40"
+                  className="bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-white text-xs rounded-lg px-2.5 py-1 border border-[#F21B2D] focus:outline-none w-32 sm:w-40"
                 />
                 <button
                   type="submit"
-                  className="p-1 rounded-lg bg-amber-500 text-stone-950 hover:bg-amber-400"
+                  className="p-1 rounded-lg bg-[#F21B2D] text-white hover:bg-[#D91424]"
                   title="Save new bar"
                 >
                   <Check className="w-3.5 h-3.5" />
@@ -524,7 +530,7 @@ export const Header: React.FC<HeaderProps> = ({
                     setIsAddingBar(false);
                     setNewBarInput('');
                   }}
-                  className="p-1 rounded-lg bg-stone-800 text-stone-400 hover:text-white"
+                  className="p-1 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] text-zinc-500 hover:text-[#18181B] dark:hover:text-white border border-[#E4E4E7] dark:border-[#27272A]"
                   title="Cancel"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -545,11 +551,11 @@ export const Header: React.FC<HeaderProps> = ({
                     if (e.key === 'Escape') setIsRenamingBar(false);
                   }}
                   autoFocus
-                  className="bg-stone-900 text-white text-xs rounded-md px-2 py-0.5 border border-amber-400 focus:outline-none w-28 sm:w-36"
+                  className="bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-white text-xs rounded-lg px-2 py-0.5 border border-[#F21B2D] focus:outline-none w-28 sm:w-36"
                 />
                 <button
                   type="submit"
-                  className="p-1 rounded bg-emerald-500 text-stone-950 hover:bg-emerald-400"
+                  className="p-1 rounded-lg bg-[#F21B2D] text-white hover:bg-[#D91424]"
                   title="Confirm rename"
                 >
                   <Check className="w-3.5 h-3.5" />
@@ -557,7 +563,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsRenamingBar(false)}
-                  className="p-1 rounded bg-stone-800 text-stone-400 hover:text-white"
+                  className="p-1 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] text-zinc-500 hover:text-[#18181B] dark:hover:text-white border border-[#E4E4E7] dark:border-[#27272A]"
                   title="Cancel rename"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -574,9 +580,9 @@ export const Header: React.FC<HeaderProps> = ({
                       setIsPickerOpen(false);
                     }}
                     title="Add a new bar venue"
-                    className="p-1 px-2 rounded-lg font-semibold whitespace-nowrap border border-dashed border-stone-700 hover:border-amber-400/60 text-stone-300 hover:text-amber-300 bg-stone-900/60 transition-colors flex items-center gap-1"
+                    className="p-1 px-2 rounded-xl font-semibold whitespace-nowrap border border-dashed border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] text-zinc-600 dark:text-zinc-300 hover:text-[#F21B2D] bg-[#FFFFFF] dark:bg-[#18181B] transition-colors flex items-center gap-1"
                   >
-                    <Plus className="w-3.5 h-3.5 text-amber-400" />
+                    <Plus className="w-3.5 h-3.5 text-[#F21B2D]" />
                     <span className="hidden sm:inline text-[11px]">New Bar</span>
                   </button>
                 )}
@@ -588,10 +594,10 @@ export const Header: React.FC<HeaderProps> = ({
                         type="button"
                         onClick={startRenaming}
                         title={`Rename ${activeBar}`}
-                        className="p-1 px-1.5 text-stone-300 hover:text-amber-300 bg-stone-900 hover:bg-stone-800 border border-stone-800 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                        className="p-1 px-1.5 text-zinc-600 dark:text-zinc-300 hover:text-[#F21B2D] bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                         aria-label={`Rename bar ${activeBar}`}
                       >
-                        <Pencil className="w-3.5 h-3.5 text-amber-400" />
+                        <Pencil className="w-3.5 h-3.5 text-[#F21B2D]" />
                         <span className="hidden md:inline text-[11px] font-semibold">Rename</span>
                       </button>
                     )}
@@ -605,11 +611,11 @@ export const Header: React.FC<HeaderProps> = ({
                           onDeleteBar(activeBar);
                         }}
                         title={`Delete ${activeBar} and all of its drinks`}
-                        className="p-1 px-1.5 text-stone-400 hover:text-rose-400 bg-stone-900 hover:bg-rose-950/60 border border-stone-800 hover:border-rose-800/80 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                        className="p-1 px-1.5 text-zinc-500 dark:text-zinc-400 hover:text-[#F21B2D] bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D]/50 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
                         aria-label={`Delete bar ${activeBar}`}
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                        <span className="hidden md:inline text-[11px] font-semibold text-rose-400">
+                        <Trash2 className="w-3.5 h-3.5 text-[#F21B2D]" />
+                        <span className="hidden md:inline text-[11px] font-semibold text-[#F21B2D]">
                           Delete
                         </span>
                       </button>
