@@ -8,7 +8,7 @@ import {
   sanitizeDrinkItem,
   isExplicitZeroAlcohol,
   normalizeCafePrice,
-} from './src/utils/calculator';
+} from './src/utils/calculator.js';
 
 dotenv.config();
 

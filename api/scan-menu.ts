@@ -4,7 +4,7 @@ import {
   sanitizeDrinkItem,
   isExplicitZeroAlcohol,
   normalizeCafePrice,
-} from '../src/utils/calculator';
+} from '../src/utils/calculator.js';
 
 // Lazily initialize Google GenAI client so env vars loaded at runtime are always picked up
 let aiClient: GoogleGenAI | null = null;
