@@ -15,6 +15,8 @@ import {
   MapPin,
   Sun,
   Moon,
+  User,
+  UserCheck,
 } from 'lucide-react';
 import { DrinkItem, filterDrinksByBar, normalizeBarKey, DEFAULT_BAR_NAME } from '../utils/calculator';
 import { BrandLogo } from './BrandLogo';
@@ -33,6 +35,9 @@ interface HeaderProps {
   onDeleteBar?: (bar: string) => void;
   theme?: 'light' | 'dark';
   onToggleTheme?: () => void;
+  accountName?: string | null;
+  syncStatus?: 'idle' | 'saving' | 'saved' | 'offline';
+  onOpenAccount?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -49,6 +54,9 @@ export const Header: React.FC<HeaderProps> = ({
   onDeleteBar,
   theme = 'light',
   onToggleTheme,
+  accountName,
+  syncStatus,
+  onOpenAccount,
 }) => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [barSearchQuery, setBarSearchQuery] = useState('');
@@ -190,6 +198,38 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {onOpenAccount && (
+              <button
+                type="button"
+                onClick={onOpenAccount}
+                title={accountName ? `Account: ${accountName}` : 'Log in or create account'}
+                className={`px-2.5 py-1.5 sm:py-2 rounded-xl transition-colors border text-xs font-semibold flex items-center gap-1.5 max-w-[140px] ${
+                  accountName
+                    ? 'bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-white border-[#F21B2D]/40 hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A]'
+                    : 'bg-[#FFF2F3] dark:bg-[#121214] text-zinc-600 dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white border-[#E4E4E7] dark:border-[#27272A] hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A]'
+                }`}
+                aria-label={accountName ? `Account (${accountName})` : 'Log in or create account'}
+              >
+                {accountName ? (
+                  <>
+                    <UserCheck className="w-4 h-4 text-[#F21B2D] shrink-0" />
+                    <span className="truncate hidden sm:inline">{accountName}</span>
+                    {syncStatus === 'offline' && (
+                      <span
+                        className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
+                        title="Offline — waiting to sync"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <User className="w-4 h-4 shrink-0" />
+                    <span className="hidden sm:inline">Account</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {onToggleTheme && (
               <button
                 type="button"

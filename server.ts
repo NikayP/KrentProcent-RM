@@ -9,6 +9,7 @@ import {
   isExplicitZeroAlcohol,
   normalizeCafePrice,
 } from './src/utils/calculator.js';
+import loginHandler from './api/login.js';
 
 dotenv.config();
 
@@ -46,6 +47,9 @@ app.get('/api/config', (_req, res) => {
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()),
   });
 });
+
+// Username/email login endpoint (mirrors Vercel serverless function api/login.ts)
+app.post('/api/login', (req, res) => loginHandler(req as any, res as any));
 
 // Menu scanning API endpoint
 app.post('/api/scan-menu', async (req, res) => {

@@ -1,0 +1,166 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createClient } from '@supabase/supabase-js';
+
+export const GENERIC_LOGIN_ERROR = 'Wrong username/email or password.';
+export const USERNAME_REGEX = /^[a-z0-9._-]{3,24}$/;
+
+export function isEmailIdentifier(identifier: string): boolean {
+  return identifier.trim().includes('@');
+}
+
+export interface LoginDeps {
+  findUserIdByUsername: (username: string) => Promise<string | null>;
+  getEmailByUserId: (userId: string) => Promise<string | null>;
+  signInWithPassword: (
+    email: string,
+    password: string
+  ) => Promise<{
+    session: { access_token: string; refresh_token: string } | null;
+    error: { message?: string; status?: number } | null;
+  }>;
+}
+
+export interface LoginResult {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+/**
+ * Pure login execution logic shared between the Vercel/Express endpoint and unit tests.
+ */
+export async function executeLogin(rawBody: unknown, deps: LoginDeps): Promise<LoginResult> {
+  const body = (rawBody && typeof rawBody === 'object' ? rawBody : {}) as Record<string, unknown>;
+  const rawIdentifier = typeof body.identifier === 'string' ? body.identifier.trim() : '';
+  const password = typeof body.password === 'string' ? body.password : '';
+
+  if (!rawIdentifier || !password) {
+    return {
+      status: 400,
+      body: { error: 'Please enter your username or email and password.' },
+    };
+  }
+
+  if (rawIdentifier.length > 320 || password.length > 200) {
+    return {
+      status: 400,
+      body: { error: 'Input is too long.' },
+    };
+  }
+
+  let email: string;
+  if (isEmailIdentifier(rawIdentifier)) {
+    email = rawIdentifier;
+  } else {
+    const normalizedUsername = rawIdentifier.toLowerCase();
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+      return { status: 401, body: { error: GENERIC_LOGIN_ERROR } };
+    }
+
+    const userId = await deps.findUserIdByUsername(normalizedUsername);
+    if (!userId) {
+      return { status: 401, body: { error: GENERIC_LOGIN_ERROR } };
+    }
+
+    const resolvedEmail = await deps.getEmailByUserId(userId);
+    if (!resolvedEmail) {
+      return { status: 401, body: { error: GENERIC_LOGIN_ERROR } };
+    }
+    email = resolvedEmail;
+  }
+
+  const { session, error } = await deps.signInWithPassword(email, password);
+
+  if (error) {
+    const msg = error.message || '';
+    if (error.status === 429 || /rate limit|too many/i.test(msg)) {
+      return {
+        status: 429,
+        body: { error: 'Too many login attempts. Please try again later.' },
+      };
+    }
+    if (/email not confirmed/i.test(msg)) {
+      return {
+        status: 403,
+        body: { error: 'Please confirm your email address before logging in.' },
+      };
+    }
+    return { status: 401, body: { error: GENERIC_LOGIN_ERROR } };
+  }
+
+  if (!session) {
+    return { status: 401, body: { error: GENERIC_LOGIN_ERROR } };
+  }
+
+  return {
+    status: 200,
+    body: {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    },
+  };
+}
+
+function buildSupabaseDeps(): LoginDeps | null {
+  const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
+  const anonKey = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+    return null;
+  }
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const anonClient = createClient(supabaseUrl, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  return {
+    async findUserIdByUsername(username: string) {
+      const { data, error } = await adminClient
+        .from('profiles')
+        .select('user_id')
+        .eq('username', username)
+        .maybeSingle();
+      if (error || !data?.user_id) return null;
+      return data.user_id as string;
+    },
+    async getEmailByUserId(userId: string) {
+      const { data, error } = await adminClient.auth.admin.getUserById(userId);
+      if (error || !data?.user?.email) return null;
+      return data.user.email;
+    },
+    async signInWithPassword(email: string, password: string) {
+      const { data, error } = await anonClient.auth.signInWithPassword({ email, password });
+      return {
+        session: data?.session
+          ? {
+              access_token: data.session.access_token,
+              refresh_token: data.session.refresh_token,
+            }
+          : null,
+        error: error ? { message: error.message, status: error.status } : null,
+      };
+    },
+  };
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
+  const deps = buildSupabaseDeps();
+  if (!deps) {
+    return res.status(503).json({ error: 'Accounts are not configured on this server.' });
+  }
+
+  try {
+    const result = await executeLogin(req.body, deps);
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error('[api/login] Unexpected error:', err);
+    return res.status(500).json({ error: 'Login failed. Please try again.' });
+  }
+}
