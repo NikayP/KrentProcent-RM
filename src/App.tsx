@@ -165,9 +165,13 @@ export default function App() {
   const drinksRef = useRef(drinks);
   const managedBarsRef = useRef(managedBars);
   const activeBarRef = useRef(activeBar);
+  const sessionRef = useRef(session);
+  const syncReadyRef = useRef(syncReady);
   drinksRef.current = drinks;
   managedBarsRef.current = managedBars;
   activeBarRef.current = activeBar;
+  sessionRef.current = session;
+  syncReadyRef.current = syncReady;
 
   const pendingAuthModeRef = useRef<'login' | 'register' | null>(null);
   const initializedUserIdRef = useRef<string | null>(null);
@@ -412,9 +416,10 @@ export default function App() {
     };
   }, []);
 
-  // Debounced auto-save to cloud on local changes while logged in
+  // Debounced auto-save to cloud ONLY when local drinks/managedBars actually change
   useEffect(() => {
-    if (!supabase || !session || !syncReady) return;
+    const activeSession = sessionRef.current;
+    if (!supabase || !activeSession || !syncReadyRef.current) return;
     if (skipNextSyncRef.current) {
       skipNextSyncRef.current = false;
       return;
@@ -424,7 +429,7 @@ export default function App() {
     setSyncStatus('saving');
 
     const timer = setTimeout(() => {
-      void saveUserData(session.user.id, drinks, managedBars)
+      void saveUserData(activeSession.user.id, drinks, managedBars)
         .then(() => {
           setSyncDirty(false);
           pendingRetryRef.current = null;
@@ -433,10 +438,10 @@ export default function App() {
         .catch(() => {
           setSyncStatus('offline');
         });
-    }, 1500);
+    }, 600);
 
     return () => clearTimeout(timer);
-  }, [drinks, managedBars, session, syncReady]);
+  }, [drinks, managedBars]);
 
   // Retry pending cloud sync when browser regains connectivity
   useEffect(() => {
