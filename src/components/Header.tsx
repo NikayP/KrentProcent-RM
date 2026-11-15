@@ -111,6 +111,124 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [isPickerOpen, availableBars.length]);
 
+  const [isMobileCollapsed, setIsMobileCollapsed] = useState(false);
+  const lastScrollYRef = useRef(0);
+  const scrollDeltaRef = useRef(0);
+  const lastToggleAtRef = useRef(0);
+  const ignoreScrollUntilRef = useRef(0);
+
+  // Always expand header when switching tabs or interacting with bar controls
+  useEffect(() => {
+    setIsMobileCollapsed(false);
+    scrollDeltaRef.current = 0;
+  }, [activeTab, isPickerOpen, isAddingBar, isRenamingBar]);
+
+  // Smooth hide-on-scroll-down / show-on-scroll-up for mobile (< sm)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    lastScrollYRef.current = Math.max(0, window.scrollY);
+    let rafId: number | null = null;
+
+    const handleResize = () => {
+      // Mobile browser URL bar show/hide changes innerHeight and can nudge scrollY;
+      // resync baseline and ignore brief resize-induced scroll noise.
+      lastScrollYRef.current = Math.max(0, window.scrollY);
+      scrollDeltaRef.current = 0;
+      ignoreScrollUntilRef.current = performance.now() + 180;
+      if (window.innerWidth >= 640) {
+        setIsMobileCollapsed(false);
+      }
+    };
+
+    const processScroll = () => {
+      rafId = null;
+
+      if (window.innerWidth >= 640 || isPickerOpen || isAddingBar || isRenamingBar) {
+        scrollDeltaRef.current = 0;
+        setIsMobileCollapsed(false);
+        lastScrollYRef.current = Math.max(0, window.scrollY);
+        return;
+      }
+
+      const now = performance.now();
+      const currentY = Math.max(0, window.scrollY);
+      const delta = currentY - lastScrollYRef.current;
+      lastScrollYRef.current = currentY;
+
+      // Always reveal near the top of the page
+      if (currentY <= 32) {
+        scrollDeltaRef.current = 0;
+        setIsMobileCollapsed((prev) => {
+          if (prev) lastToggleAtRef.current = now;
+          return false;
+        });
+        return;
+      }
+
+      if (now < ignoreScrollUntilRef.current) {
+        return;
+      }
+
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      // Don't collapse on short pages where there isn't meaningful scroll room
+      if (maxScroll < 180) {
+        scrollDeltaRef.current = 0;
+        setIsMobileCollapsed(false);
+        return;
+      }
+
+      // Ignore bottom overscroll / rubber-band bounce
+      if (currentY >= maxScroll - 32 && delta < 0) {
+        return;
+      }
+
+      // Ignore sub-pixel / tiny touch-tremor noise
+      if (Math.abs(delta) < 2) {
+        return;
+      }
+
+      if ((delta > 0 && scrollDeltaRef.current < 0) || (delta < 0 && scrollDeltaRef.current > 0)) {
+        scrollDeltaRef.current = 0;
+      }
+      scrollDeltaRef.current += delta;
+
+      // Cooldown matching the CSS transition prevents mid-animation direction flipping
+      if (now - lastToggleAtRef.current < 320) {
+        return;
+      }
+
+      if (scrollDeltaRef.current >= 56 && currentY > 140) {
+        scrollDeltaRef.current = 0;
+        setIsMobileCollapsed((prev) => {
+          if (!prev) lastToggleAtRef.current = now;
+          return true;
+        });
+      } else if (scrollDeltaRef.current <= -48) {
+        scrollDeltaRef.current = 0;
+        setIsMobileCollapsed((prev) => {
+          if (prev) lastToggleAtRef.current = now;
+          return false;
+        });
+      }
+    };
+
+    const onScroll = () => {
+      if (rafId === null) {
+        rafId = window.requestAnimationFrame(processScroll);
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', handleResize);
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
+  }, [isPickerOpen, isAddingBar, isRenamingBar]);
+
   // Precompute drink count per bar in a single pass
   const barCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -200,7 +318,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top)] bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 backdrop-blur-md border-b border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FFFFFF] shadow-sm transition-colors duration-200 select-none">
+    <header
+      className={`sticky top-0 z-40 pt-[env(safe-area-inset-top)] bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 backdrop-blur-md border-b border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FFFFFF] shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform select-none sm:translate-y-0 ${
+        isMobileCollapsed
+          ? '-translate-y-[calc(100%+4px)] pointer-events-none sm:pointer-events-auto'
+          : 'translate-y-0'
+      }`}
+    >
       <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 sm:px-6 space-y-2.5">
         {/* Top Row: Brand & Theme/Reset Controls */}
         <div className="flex items-center justify-between gap-3">
