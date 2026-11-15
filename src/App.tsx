@@ -53,7 +53,7 @@ import {
   saveUserData,
   deleteOwnAccount,
 } from './utils/supabase';
-import { ShieldCheck, Info, Check, Sparkles, HelpCircle } from 'lucide-react';
+import { ShieldCheck, Info, Check, Sparkles, HelpCircle, Beer, X } from 'lucide-react';
 
 const STORAGE_KEY = 'krentprocent_drinks_v2';
 const MANAGED_BARS_KEY = 'krentprocent_bars_v2';
@@ -61,6 +61,8 @@ const ACTIVE_BAR_KEY = 'krentprocent_active_bar_v2';
 const TOUR_STORAGE_KEY = 'krentprocent_has_seen_tour_v1';
 const THEME_STORAGE_KEY = 'krentprocent_theme_v1';
 const DIRTY_STORAGE_KEY = 'krentprocent_account_dirty_v1';
+const SUPPORT_DISMISSED_KEY = 'krentprocent_support_dismissed_v1';
+const SUPPORT_URL = 'https://ko-fi.com/kwalister';
 
 function isSyncDirty(): boolean {
   try {
@@ -275,6 +277,25 @@ export default function App() {
   const [resetPending, setResetPending] = useState<boolean>(false);
   const [deleteAccountPending, setDeleteAccountPending] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [supportDismissed, setSupportDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SUPPORT_DISMISSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const forceSupportHint =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('support') === '1';
+
+  const dismissSupport = useCallback(() => {
+    setSupportDismissed(true);
+    try {
+      localStorage.setItem(SUPPORT_DISMISSED_KEY, '1');
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
 
   // Account & cloud sync state (optional — inactive when Supabase env vars are absent)
   const [session, setSession] = useState<Session | null>(null);
@@ -984,6 +1005,38 @@ export default function App() {
               availableBars={availableBars}
               onSelectBar={setActiveBar}
             />
+            {(forceSupportHint ||
+              (!supportDismissed &&
+                !isTourOpen &&
+                drinks.length >= 3 &&
+                !isUntouchedPresetBoard(drinks, managedBars))) && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#E4E4E7] dark:border-[#27272A] bg-[#FFFFFF]/90 dark:bg-[#18181B]/90 px-4 py-2.5 text-xs text-zinc-600 dark:text-zinc-400">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Beer className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
+                  <span className="leading-snug">Enjoying KrentProcent?</span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a
+                    href={SUPPORT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={dismissSupport}
+                    className="px-2.5 py-1 rounded-lg bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] border border-[#E4E4E7] dark:border-[#27272A] font-semibold transition-colors whitespace-nowrap"
+                  >
+                    Buy me a beer
+                  </a>
+                  <button
+                    type="button"
+                    onClick={dismissSupport}
+                    className="p-1 rounded-lg text-zinc-400 hover:text-[#18181B] dark:hover:text-white transition-colors cursor-pointer"
+                    aria-label="Dismiss support message"
+                    title="Dismiss"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
             <Leaderboard
               drinks={drinks}
               currency={currency}
@@ -1112,6 +1165,17 @@ export default function App() {
               <HelpCircle className="w-3 h-3" />
               <span>Quick Tour</span>
             </button>
+            <a
+              href={SUPPORT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={dismissSupport}
+              className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-[#F21B2D] dark:hover:text-[#FF8A8E] font-semibold flex items-center gap-1 transition-colors"
+              title="Buy me a beer on Ko-fi"
+            >
+              <Beer className="w-3 h-3" />
+              <span>Buy me a beer</span>
+            </a>
           </div>
 
           <div className="text-center sm:text-right text-zinc-600 dark:text-zinc-400 max-w-md flex items-center gap-1.5 justify-center sm:justify-end">
