@@ -682,11 +682,7 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
             </div>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
             <span className="text-zinc-500 dark:text-zinc-400 tabular-nums">
-              {preview.pureAlcoholMl} ml alc ({preview.standardDrinks} std)
-            </span>
-            <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">·</span>
-            <span className="text-zinc-500 dark:text-zinc-400 tabular-nums hidden sm:inline">
-              {formatCurrency(preview.costPerStandardDrink, currency)}/std
+              {preview.pureAlcoholMl} ml pure alc
             </span>
 
             {!showNotes && (

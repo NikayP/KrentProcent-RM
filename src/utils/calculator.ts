@@ -15,8 +15,6 @@ export interface DrinkItem {
 export interface CalculatedDrink extends DrinkItem {
   pureAlcoholMl: number; // in ml
   pureAlcoholPerCurrency: number; // ml of pure alcohol per 1 currency unit (the Krent Score)
-  costPerStandardDrink: number; // currency cost per standard drink (12.5ml pure alcohol)
-  standardDrinks: number; // number of standard drinks (12.5ml units) in this serving
   pricePerLiter: number; // price per 1000ml of liquid
   pricePer100mlPureAlcohol: number;
   efficiencyRank?: number;
@@ -29,7 +27,6 @@ export interface BarSummary {
   bestDrink: CalculatedDrink | null;
   worstDrink: CalculatedDrink | null;
   averageKrentScore: number;
-  averageStandardDrinkCost: number;
   averagePricePerLiter: number;
   cheapestDrink: CalculatedDrink | null;
 }
@@ -55,7 +52,6 @@ export interface CrossBarDrinkComparison {
   maxValueAdvantagePercent: number;
 }
 
-export const STANDARD_DRINK_ALCOHOL_ML = 12.5; // ~10 grams of pure alcohol (standard Dutch/EU unit)
 export const DEFAULT_BAR_NAME = 'Current Bar';
 
 const VALID_CATEGORIES: ReadonlySet<DrinkCategory> = new Set([
@@ -885,27 +881,6 @@ export function calculateAlcoholPerCurrency(pureAlcoholMl: number, price: number
 }
 
 /**
- * Calculates cost for one standard drink (~12.5ml pure alcohol).
- */
-export function calculateCostPerStandardDrink(
-  pureAlcoholMl: number,
-  price: number,
-  standardUnitMl = STANDARD_DRINK_ALCOHOL_ML
-): number {
-  if (
-    !Number.isFinite(pureAlcoholMl) ||
-    !Number.isFinite(price) ||
-    !Number.isFinite(standardUnitMl) ||
-    pureAlcoholMl <= 0 ||
-    price <= 0 ||
-    standardUnitMl <= 0
-  ) {
-    return 0;
-  }
-  return (standardUnitMl / pureAlcoholMl) * price;
-}
-
-/**
  * Full calculation for a single drink item.
  */
 export function calculateDrinkMetrics(drink: DrinkItem): CalculatedDrink {
@@ -915,8 +890,6 @@ export function calculateDrinkMetrics(drink: DrinkItem): CalculatedDrink {
 
   const pureAlcoholMl = calculatePureAlcoholMl(safeVolume, safeAbv);
   const pureAlcoholPerCurrency = calculateAlcoholPerCurrency(pureAlcoholMl, safePrice);
-  const costPerStandardDrink = calculateCostPerStandardDrink(pureAlcoholMl, safePrice);
-  const standardDrinks = pureAlcoholMl > 0 ? pureAlcoholMl / STANDARD_DRINK_ALCOHOL_ML : 0;
   const pricePerLiter = safeVolume > 0 && safePrice > 0 ? (safePrice / safeVolume) * 1000 : 0;
   const pricePer100mlPureAlcohol =
     pureAlcoholMl > 0 && safePrice > 0 ? (safePrice / pureAlcoholMl) * 100 : 0;
@@ -926,8 +899,6 @@ export function calculateDrinkMetrics(drink: DrinkItem): CalculatedDrink {
     barName: drink.barName?.trim() || DEFAULT_BAR_NAME,
     pureAlcoholMl: Number(pureAlcoholMl.toFixed(2)),
     pureAlcoholPerCurrency: Number(pureAlcoholPerCurrency.toFixed(3)),
-    costPerStandardDrink: Number(costPerStandardDrink.toFixed(2)),
-    standardDrinks: Number(standardDrinks.toFixed(2)),
     pricePerLiter: Number(pricePerLiter.toFixed(2)),
     pricePer100mlPureAlcohol: Number(pricePer100mlPureAlcohol.toFixed(2)),
   };
@@ -1424,15 +1395,12 @@ export function calculateBarSummaries(
           bestDrink: null,
           worstDrink: null,
           averageKrentScore: 0,
-          averageStandardDrinkCost: 0,
           averagePricePerLiter: 0,
           cheapestDrink: null,
         };
       }
 
       const totalKrent = ranked.reduce((acc, d) => acc + d.pureAlcoholPerCurrency, 0);
-      const alcoholicRanked = ranked.filter((d) => d.pureAlcoholMl > 0);
-      const totalCost = alcoholicRanked.reduce((acc, d) => acc + d.costPerStandardDrink, 0);
       const totalPricePerLiter = ranked.reduce((acc, d) => acc + d.pricePerLiter, 0);
       const sortedByPrice = [...ranked].sort((a, b) => a.price - b.price);
 
@@ -1442,8 +1410,6 @@ export function calculateBarSummaries(
         bestDrink: ranked[0],
         worstDrink: ranked[ranked.length - 1],
         averageKrentScore: Number((totalKrent / ranked.length).toFixed(3)),
-        averageStandardDrinkCost:
-          alcoholicRanked.length > 0 ? Number((totalCost / alcoholicRanked.length).toFixed(2)) : 0,
         averagePricePerLiter: Number((totalPricePerLiter / ranked.length).toFixed(2)),
         cheapestDrink: sortedByPrice[0],
       };

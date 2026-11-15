@@ -328,7 +328,7 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
                   <span className="text-xs font-medium tracking-normal text-zinc-500 dark:text-zinc-400">ml / {currency}</span>
                 </div>
                 <div className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums">
-                  {drink.pureAlcoholMl} ml pure alc ({drink.standardDrinks} std)
+                  {drink.pureAlcoholMl} ml pure alc
                 </div>
               </div>
 
@@ -399,13 +399,6 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
                 Per Liter:{' '}
                 <span className="text-[#18181B] dark:text-zinc-200 font-semibold tabular-nums">
                   {formatCurrency(drink.pricePerLiter, currency)}/L
-                </span>
-              </span>
-              <span>&bull;</span>
-              <span>
-                Std Drink:{' '}
-                <span className="text-[#18181B] dark:text-[#FFFFFF] font-bold tabular-nums">
-                  {formatCurrency(drink.costPerStandardDrink, currency)}
                 </span>
               </span>
             </div>

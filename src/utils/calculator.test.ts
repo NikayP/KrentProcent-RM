@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   calculatePureAlcoholMl,
   calculateAlcoholPerCurrency,
-  calculateCostPerStandardDrink,
   calculateDrinkMetrics,
   rankDrinks,
   getUniqueBars,
@@ -54,13 +53,7 @@ test('calculateAlcoholPerCurrency computes pure ml per currency unit', () => {
   assert.equal(calculateAlcoholPerCurrency(25, Number.NaN), 0);
 });
 
-test('calculateCostPerStandardDrink calculates cost for 12.5ml unit', () => {
-  // If 25ml costs €5, 12.5ml costs €2.50
-  assert.equal(calculateCostPerStandardDrink(25, 5, 12.5), 2.5);
-  assert.equal(calculateCostPerStandardDrink(0, 5, 12.5), 0);
-});
-
-test('calculateDrinkMetrics returns complete metric object with standardDrinks and pricePerLiter', () => {
+test('calculateDrinkMetrics returns complete metric object with pricePerLiter', () => {
   const drink: DrinkItem = {
     id: 'test-1',
     name: 'Pilsner Pint',
@@ -73,8 +66,6 @@ test('calculateDrinkMetrics returns complete metric object with standardDrinks a
   const metrics = calculateDrinkMetrics(drink);
   assert.equal(metrics.pureAlcoholMl, 25);
   assert.equal(metrics.pureAlcoholPerCurrency, 5);
-  assert.equal(metrics.costPerStandardDrink, 2.5);
-  assert.equal(metrics.standardDrinks, 2);
   assert.equal(metrics.pricePerLiter, 10);
   assert.equal(metrics.pricePer100mlPureAlcohol, 20);
   assert.equal(metrics.barName, 'Café Gollem');

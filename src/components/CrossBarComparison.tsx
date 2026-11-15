@@ -18,7 +18,6 @@ import {
   Check,
   X,
   Beer,
-  Coins,
   MapPin,
   Lock,
   Globe,
@@ -126,13 +125,6 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
     );
   }
 
-  const cheapestBar =
-    populatedSummaries.length > 0
-      ? [...populatedSummaries].sort(
-          (a, b) => a.averageStandardDrinkCost - b.averageStandardDrinkCost
-        )[0]
-      : null;
-
   const highestValueBar = populatedSummaries[0] || null;
 
   return (
@@ -189,9 +181,9 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
           )}
         </div>
 
-        {/* Quick Highlights */}
-        {highestValueBar && cheapestBar && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-[#E4E4E7] dark:border-[#27272A]">
+        {/* Quick Highlight */}
+        {highestValueBar && (
+          <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A]">
             <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3.5 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#F21B2D] inline-flex items-center gap-1">
@@ -209,29 +201,6 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
               <button
                 onClick={() => onSelectBar(highestValueBar.barName)}
                 className="px-3 py-1.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold text-xs flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
-              >
-                <span>View Bar</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3.5 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#D91424] dark:text-[#FF8A8E] inline-flex items-center gap-1">
-                  <Coins className="w-3 h-3 shrink-0" />
-                  <span>Cheapest Standard Drink</span>
-                </span>
-                <h4 className="text-base font-extrabold tracking-[-0.02em] text-[#18181B] dark:text-[#FFFFFF] truncate">{cheapestBar.barName}</h4>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Avg Std Drink:{' '}
-                  <span className="text-[#18181B] dark:text-[#FFFFFF] font-bold tabular-nums">
-                    {formatCurrency(cheapestBar.averageStandardDrinkCost, currency)}
-                  </span>
-                </p>
-              </div>
-              <button
-                onClick={() => onSelectBar(cheapestBar.barName)}
-                className="px-3 py-1.5 rounded-xl bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] font-bold text-xs flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
               >
                 <span>View Bar</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -345,13 +314,6 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                       <span className="text-zinc-500 dark:text-zinc-400">Avg Krent Score:</span>
                       <span className="text-[#F21B2D] font-extrabold tracking-[-0.02em] text-sm tabular-nums">
                         {summary.averageKrentScore} ml / {currency}
-                      </span>
-                    </div>
-
-                    <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-2.5 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between">
-                      <span className="text-zinc-500 dark:text-zinc-400">Avg Std Drink Cost:</span>
-                      <span className="text-[#18181B] dark:text-zinc-200 font-bold tabular-nums">
-                        {formatCurrency(summary.averageStandardDrinkCost, currency)}
                       </span>
                     </div>
 
