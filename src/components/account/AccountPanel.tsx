@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import {
   User,
-  UserCheck,
   Eye,
   EyeOff,
   Loader2,
   Mail,
   KeyRound,
   AlertCircle,
+  Cloud,
+  Globe,
+  Smartphone,
 } from 'lucide-react';
 import {
   logInWithIdentifier,
@@ -38,6 +40,10 @@ export interface AccountPanelProps {
   onUsernameChanged: (newUsername: string) => void;
   onShowToast: (msg: string) => void;
   localDrinkCount: number;
+  barCount?: number;
+  publicBarCount?: number;
+  onGoToMyBars?: () => void;
+  onGoToDiscover?: () => void;
   onClose?: () => void;
   onSubmittingChange?: (submitting: boolean) => void;
   titleId?: string;
@@ -55,6 +61,10 @@ export const AccountPanel: React.FC<AccountPanelProps> = ({
   onUsernameChanged,
   onShowToast,
   localDrinkCount,
+  barCount = 0,
+  publicBarCount = 0,
+  onGoToMyBars,
+  onGoToDiscover,
   onClose,
   onSubmittingChange,
   titleId = 'account-panel-title',
@@ -227,62 +237,46 @@ export const AccountPanel: React.FC<AccountPanelProps> = ({
     session?.user?.email ||
     'Account';
 
-  const panelTitle = isRecovery
-    ? 'Choose New Password'
-    : session
-      ? 'Your Account'
-      : view === 'register'
-        ? 'Create Account'
-        : view === 'forgot'
-          ? 'Reset Password'
-          : 'Log In';
+  const feedbackBanner = (errorMsg || infoMsg) && (
+    <div aria-live="polite" className="space-y-2">
+      {errorMsg && (
+        <div className="flex items-start gap-2 rounded-xl border border-[#F21B2D]/40 bg-[#F21B2D]/10 px-3 py-2.5 text-xs text-[#D91424] dark:text-[#FF8A8E] font-medium">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+      {infoMsg && (
+        <div className="flex items-start gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+          <Mail className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{infoMsg}</span>
+        </div>
+      )}
+    </div>
+  );
 
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3 pr-8">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30">
-          {isRecovery ? (
+  // VIEW 1: PASSWORD RECOVERY
+  if (isRecovery) {
+    return (
+      <div className="max-w-lg bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30">
             <KeyRound className="w-5 h-5" />
-          ) : session ? (
-            <UserCheck className="w-5 h-5" />
-          ) : (
-            <User className="w-5 h-5" />
-          )}
-        </div>
-        <div>
-          <h3
-            id={titleId}
-            className="text-base sm:text-lg font-bold text-[#18181B] dark:text-[#FFFFFF]"
-          >
-            {panelTitle}
-          </h3>
-          {!session && !isRecovery && (
+          </div>
+          <div>
+            <h3
+              id={titleId}
+              className="text-base sm:text-lg font-extrabold tracking-[-0.02em] text-[#18181B] dark:text-[#FFFFFF]"
+            >
+              Choose New Password
+            </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Save your scanned menus to access them on any device.
+              Set a new password for your KrentProcent account.
             </p>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Feedback Banner */}
-      <div aria-live="polite">
-        {errorMsg && (
-          <div className="flex items-start gap-2 rounded-xl border border-[#F21B2D]/40 bg-[#F21B2D]/10 px-3 py-2.5 text-xs text-[#D91424] dark:text-[#FF8A8E] font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-        {infoMsg && (
-          <div className="flex items-start gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300 font-medium">
-            <Mail className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{infoMsg}</span>
-          </div>
-        )}
-      </div>
+        {feedbackBanner}
 
-      {/* VIEW 1: PASSWORD RECOVERY */}
-      {isRecovery && (
         <form onSubmit={handleRecoverySubmit} className="space-y-3.5">
           <div>
             <label
@@ -302,8 +296,7 @@ export const AccountPanel: React.FC<AccountPanelProps> = ({
                 required
                 minLength={8}
                 maxLength={200}
-                autoFocus
-                className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl pl-3 pr-10 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl pl-3 pr-10 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
               />
               <button
                 type="button"
@@ -322,21 +315,29 @@ export const AccountPanel: React.FC<AccountPanelProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
             <span>Save new password</span>
           </button>
         </form>
-      )}
+      </div>
+    );
+  }
 
-      {/* VIEW 2: LOGGED IN */}
-      {!isRecovery && session && (
+  // VIEW 2: LOGGED IN — Full Account Management Hub
+  if (session) {
+    return (
+      <div className="space-y-4">
+        {feedbackBanner}
         <LoggedInView
           session={session}
           username={username}
           displayName={displayName}
           syncStatus={syncStatus}
+          localDrinkCount={localDrinkCount}
+          barCount={barCount}
+          publicBarCount={publicBarCount}
           isSubmitting={isSubmitting}
           onSubmittingChange={updateSubmitting}
           onError={(msg) => {
@@ -354,272 +355,345 @@ export const AccountPanel: React.FC<AccountPanelProps> = ({
             onClose?.();
             onRequestDeleteAccount();
           }}
+          onGoToMyBars={onGoToMyBars}
+          onGoToDiscover={onGoToDiscover}
+          titleId={titleId}
         />
-      )}
+      </div>
+    );
+  }
 
-      {/* VIEW 3: LOGGED OUT FORMS */}
-      {!isRecovery && !session && (
-        <>
-          {view === 'login' && (
-            <form onSubmit={handleLoginSubmit} className="space-y-3.5">
-              <div>
-                <label
-                  htmlFor="account-identifier"
-                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  Username or email
-                </label>
+  // VIEW 3: LOGGED OUT — 2-column Auth + Benefits layout
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div className="lg:col-span-7 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30">
+              <User className="w-5 h-5" />
+            </div>
+            <div>
+              <h3
+                id={titleId}
+                className="text-base sm:text-lg font-extrabold tracking-[-0.02em] text-[#18181B] dark:text-[#FFFFFF]"
+              >
+                {view === 'register'
+                  ? 'Create Account'
+                  : view === 'forgot'
+                    ? 'Reset Password'
+                    : 'Log In'}
+              </h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Save your scanned menus and share bars when you want.
+              </p>
+            </div>
+          </div>
+
+          {view !== 'forgot' && (
+            <div className="inline-flex p-1 rounded-xl bg-[#FAFAFA] dark:bg-[#121214] border border-[#E4E4E7] dark:border-[#27272A] self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => switchView('login')}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  view === 'login'
+                    ? 'bg-[#F21B2D] text-white'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white'
+                }`}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                onClick={() => switchView('register')}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  view === 'register'
+                    ? 'bg-[#F21B2D] text-white'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white'
+                }`}
+              >
+                Create account
+              </button>
+            </div>
+          )}
+        </div>
+
+        {feedbackBanner}
+
+        {view === 'login' && (
+          <form onSubmit={handleLoginSubmit} className="space-y-3.5">
+            <div>
+              <label
+                htmlFor="account-identifier"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Username or email
+              </label>
+              <input
+                id="account-identifier"
+                type="text"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="username or you@example.com"
+                required
+                className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="account-password"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Password
+              </label>
+              <div className="relative">
                 <input
-                  id="account-identifier"
-                  type="text"
-                  autoComplete="username"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="username or you@example.com"
+                  id="account-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your password"
                   required
-                  autoFocus
-                  className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                  className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl pl-3 pr-10 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
                 />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="account-password"
-                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-[#18181B] dark:hover:text-white p-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="account-password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Your password"
-                    required
-                    className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl pl-3 pr-10 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-[#18181B] dark:hover:text-white p-1"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => switchView('forgot')}
+                className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:underline cursor-pointer"
+              >
+                Forgot password?
+              </button>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors inline-flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>Log in</span>
               </button>
+            </div>
+          </form>
+        )}
 
-              <div className="flex items-center justify-between pt-2 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs">
-                <button
-                  type="button"
-                  onClick={() => switchView('register')}
-                  className="font-semibold text-[#F21B2D] hover:underline"
-                >
-                  Create account
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchView('forgot')}
-                  className="text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:underline"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            </form>
-          )}
+        {view === 'register' && (
+          <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+            {localDrinkCount > 0 && (
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-300 bg-[#FFF2F3] dark:bg-[#121214] border border-[#E4E4E7] dark:border-[#27272A] rounded-xl px-3 py-2">
+                Your {localDrinkCount} drink{localDrinkCount === 1 ? '' : 's'} on this device will
+                be backed up to your new account.
+              </p>
+            )}
 
-          {view === 'register' && (
-            <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-              {localDrinkCount > 0 && (
-                <p className="text-[11px] text-zinc-600 dark:text-zinc-300 bg-[#FFF2F3] dark:bg-[#121214] border border-[#E4E4E7] dark:border-[#27272A] rounded-xl px-3 py-2">
-                  Your {localDrinkCount} drink{localDrinkCount === 1 ? '' : 's'} on this device will
-                  be saved to your new account.
-                </p>
-              )}
-
-              <div>
-                <label
-                  htmlFor="account-reg-username"
-                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  Username
-                </label>
-                <input
-                  id="account-reg-username"
-                  type="text"
-                  autoComplete="username"
-                  value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
-                  placeholder="e.g. jan.kroeg"
-                  required
-                  minLength={3}
-                  maxLength={24}
-                  autoFocus
-                  className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
-                />
-                <div className="flex items-center justify-between gap-2 mt-1 text-[11px]">
-                  <span className="text-zinc-500 dark:text-zinc-400">
-                    3–24 characters: letters, numbers, . _ -
-                  </span>
-                  {usernameStatus === 'checking' && (
-                    <span className="text-zinc-400">Checking…</span>
-                  )}
-                  {usernameStatus === 'available' && (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                      Available
-                    </span>
-                  )}
-                  {usernameStatus === 'taken' && (
-                    <span className="text-[#D91424] dark:text-[#FF8A8E] font-semibold">
-                      Already taken
-                    </span>
-                  )}
-                  {usernameStatus === 'invalid' && (
-                    <span className="text-[#D91424] dark:text-[#FF8A8E] font-semibold">
-                      Invalid format
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="account-reg-email"
-                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  Email
-                </label>
-                <input
-                  id="account-reg-email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
-                />
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                  Only used if you need to reset your password.
-                </p>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="account-reg-password"
-                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="account-reg-password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
-                    required
-                    minLength={8}
-                    maxLength={200}
-                    className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl pl-3 pr-10 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-[#18181B] dark:hover:text-white p-1"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                  At least 8 characters.
-                </p>
-              </div>
-
-              <PrivacyNote />
-
-              <button
-                type="submit"
-                disabled={isSubmitting || usernameStatus === 'taken'}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+            <div>
+              <label
+                htmlFor="account-reg-username"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
               >
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>Create account</span>
-              </button>
+                Username
+              </label>
+              <input
+                id="account-reg-username"
+                type="text"
+                autoComplete="username"
+                value={regUsername}
+                onChange={(e) => setRegUsername(e.target.value)}
+                placeholder="e.g. jan.kroeg"
+                required
+                minLength={3}
+                maxLength={24}
+                className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+              />
+              <div className="flex items-center justify-between gap-2 mt-1 text-[11px]">
+                <span className="text-zinc-500 dark:text-zinc-400">
+                  3–24 characters: letters, numbers, . _ -
+                </span>
+                {usernameStatus === 'checking' && (
+                  <span className="text-zinc-400">Checking…</span>
+                )}
+                {usernameStatus === 'available' && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Available
+                  </span>
+                )}
+                {usernameStatus === 'taken' && (
+                  <span className="text-[#D91424] dark:text-[#FF8A8E] font-semibold">
+                    Already taken
+                  </span>
+                )}
+                {usernameStatus === 'invalid' && (
+                  <span className="text-[#D91424] dark:text-[#FF8A8E] font-semibold">
+                    Invalid format
+                  </span>
+                )}
+              </div>
+            </div>
 
-              <div className="flex items-center justify-center pt-2 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs">
+            <div>
+              <label
+                htmlFor="account-reg-email"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Email
+              </label>
+              <input
+                id="account-reg-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+              />
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                Only used if you need to reset your password.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="account-reg-password"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="account-reg-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  required
+                  minLength={8}
+                  maxLength={200}
+                  className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl pl-3 pr-10 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                />
                 <button
                   type="button"
-                  onClick={() => switchView('login')}
-                  className="text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-[#18181B] dark:hover:text-white p-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  Already have an account?{' '}
-                  <span className="font-semibold text-[#F21B2D]">Log in</span>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-            </form>
-          )}
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                At least 8 characters.
+              </p>
+            </div>
 
-          {view === 'forgot' && (
-            <form onSubmit={handleForgotSubmit} className="space-y-3.5">
-              <div>
-                <label
-                  htmlFor="account-forgot-email"
-                  className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
-                >
-                  Email
-                </label>
-                <input
-                  id="account-forgot-email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  autoFocus
-                  className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
-                />
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                  We&apos;ll send a link to set a new password.
-                </p>
-              </div>
+            <button
+              type="submit"
+              disabled={isSubmitting || usernameStatus === 'taken'}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>Create account</span>
+            </button>
+          </form>
+        )}
+
+        {view === 'forgot' && (
+          <form onSubmit={handleForgotSubmit} className="space-y-3.5">
+            <div>
+              <label
+                htmlFor="account-forgot-email"
+                className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1"
+              >
+                Email
+              </label>
+              <input
+                id="account-forgot-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-white text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+              />
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                We&apos;ll send a link to set a new password.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => switchView('login')}
+                className="text-xs font-semibold text-[#F21B2D] hover:underline cursor-pointer"
+              >
+                Back to log in
+              </button>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] disabled:opacity-60 text-white font-bold text-sm transition-colors inline-flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>Send reset link</span>
               </button>
+            </div>
+          </form>
+        )}
+      </div>
 
-              <div className="flex items-center justify-center pt-2 border-t border-[#E4E4E7] dark:border-[#27272A] text-xs">
-                <button
-                  type="button"
-                  onClick={() => switchView('login')}
-                  className="font-semibold text-[#F21B2D] hover:underline"
-                >
-                  Back to log in
-                </button>
-              </div>
-            </form>
-          )}
-        </>
-      )}
+      {/* Right Column: Account Benefits & Privacy */}
+      <aside className="lg:col-span-5 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <h4 className="text-sm font-bold text-[#18181B] dark:text-white">
+          Why create an account?
+        </h4>
+
+        <ul className="space-y-3 text-xs text-zinc-600 dark:text-zinc-300">
+          <li className="flex items-start gap-2.5">
+            <Cloud className="w-4 h-4 text-[#F21B2D] shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-[#18181B] dark:text-white block">
+                Automatic cloud backup
+              </span>
+              Keep your bars and scanned menus in sync between phone and laptop.
+            </div>
+          </li>
+          <li className="flex items-start gap-2.5">
+            <Globe className="w-4 h-4 text-[#F21B2D] shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-[#18181B] dark:text-white block">
+                Share menus in Discover
+              </span>
+              Opt in to publish any bar under your @username so friends can adopt it in one tap.
+            </div>
+          </li>
+          <li className="flex items-start gap-2.5">
+            <Smartphone className="w-4 h-4 text-[#F21B2D] shrink-0 mt-0.5" />
+            <div>
+              <span className="font-semibold text-[#18181B] dark:text-white block">
+                100% optional &amp; offline-ready
+              </span>
+              Everything stays saved locally on this device even if you stay logged out.
+            </div>
+          </li>
+        </ul>
+
+        <PrivacyNote />
+      </aside>
     </div>
   );
 };

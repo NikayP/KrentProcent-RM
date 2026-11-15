@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus,
   Check,
   Store,
   AlertTriangle,
   RefreshCw,
+  ChevronUp,
+  ChevronDown,
+  StickyNote,
+  X,
 } from 'lucide-react';
 import { DRINK_CATEGORY_LIST, CategoryIcon } from './CategoryIcon';
 import {
@@ -16,7 +20,6 @@ import {
   canonicalizeBarName,
   findDuplicateDrinkInBar,
   areBarNamesEquivalent,
-  normalizeDrinkKey,
 } from '../utils/calculator';
 import { POPULAR_BAR_PRESETS } from '../presets/barData';
 
@@ -29,6 +32,63 @@ interface DrinkFormProps {
   onSelectBar: (bar: string) => void;
 }
 
+const VOLUME_CHIPS_BY_CATEGORY: Record<DrinkCategory, { label: string; val: number }[]> = {
+  beer: [
+    { label: '200ml', val: 200 },
+    { label: '250ml', val: 250 },
+    { label: '330ml', val: 330 },
+    { label: '500ml', val: 500 },
+  ],
+  cider: [
+    { label: '250ml', val: 250 },
+    { label: '330ml', val: 330 },
+    { label: '440ml', val: 440 },
+    { label: '500ml', val: 500 },
+  ],
+  wine: [
+    { label: '125ml', val: 125 },
+    { label: '150ml', val: 150 },
+    { label: '175ml', val: 175 },
+    { label: '750ml', val: 750 },
+  ],
+  spirit: [
+    { label: '35ml', val: 35 },
+    { label: '50ml', val: 50 },
+    { label: '70ml', val: 70 },
+    { label: '100ml', val: 100 },
+  ],
+  cocktail: [
+    { label: '150ml', val: 150 },
+    { label: '200ml', val: 200 },
+    { label: '250ml', val: 250 },
+    { label: '330ml', val: 330 },
+  ],
+  other: [
+    { label: '150ml', val: 150 },
+    { label: '250ml', val: 250 },
+    { label: '330ml', val: 330 },
+    { label: '500ml', val: 500 },
+  ],
+};
+
+const ABV_CHIPS_BY_CATEGORY: Record<DrinkCategory, number[]> = {
+  beer: [0, 5.0, 6.5, 8.5],
+  cider: [4.5, 5.0, 6.0, 7.5],
+  wine: [11.5, 12.5, 13.5, 14.5],
+  spirit: [20, 35, 40, 45],
+  cocktail: [8, 12, 15, 20],
+  other: [5, 8.5, 12.5, 40],
+};
+
+const QUICK_TEMPLATES = [
+  { label: 'Vaasje', preset: POPULAR_BAR_PRESETS[0] },
+  { label: 'Pint', preset: POPULAR_BAR_PRESETS[1] },
+  { label: 'Fluitje', preset: POPULAR_BAR_PRESETS[2] },
+  { label: 'Tripel', preset: POPULAR_BAR_PRESETS[3] },
+  { label: 'IPA', preset: POPULAR_BAR_PRESETS[4] },
+  { label: 'Pitcher', preset: POPULAR_BAR_PRESETS[6] },
+];
+
 export const DrinkForm: React.FC<DrinkFormProps> = ({
   onAddDrink,
   existingDrinks = [],
@@ -37,21 +97,32 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
   availableBars,
   onSelectBar,
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showBarPicker, setShowBarPicker] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
+
   const [barName, setBarName] = useState(
     activeBar === 'all' ? availableBars[0] || DEFAULT_BAR_NAME : activeBar
   );
   const [name, setName] = useState('');
   const [category, setCategory] = useState<DrinkCategory>('beer');
   const [volumeMl, setVolumeMl] = useState<number>(330);
-  const [abv, setAbv] = useState<number>(5.0);
+  const [abvText, setAbvText] = useState<string>('5');
+  const abv = useMemo(() => {
+    const parsed = parseFloat(abvText);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  }, [abvText]);
   const [price, setPrice] = useState<number>(4.5);
   const [notes, setNotes] = useState('');
   const [justAddedMessage, setJustAddedMessage] = useState<string | null>(null);
+
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Sync barName when activeBar changes or when bar is deleted
   useEffect(() => {
     if (activeBar && activeBar !== 'all') {
       setBarName(activeBar);
+      setShowBarPicker(false);
     } else if (activeBar === 'all' && availableBars.length > 0) {
       const matchesKnown = availableBars.some((b) => areBarNamesEquivalent(b, barName));
       if (!matchesKnown && !barName.trim()) {
@@ -88,6 +159,13 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
     price: price || 0,
   });
 
+  const openForm = (focusName = true) => {
+    setIsExpanded(true);
+    if (focusName) {
+      setTimeout(() => nameInputRef.current?.focus(), 40);
+    }
+  };
+
   const submitWithMode = (mode: 'update_existing' | 'force_add') => {
     if (!name.trim()) return;
     if (volumeMl <= 0 || price <= 0 || abv < 0) return;
@@ -116,13 +194,14 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
     setJustAddedMessage(
       isUpdatingExisting
-        ? `Updated in ${resolvedBarName}!`
-        : `Added to ${resolvedBarName}!`
+        ? `Updated in ${resolvedBarName}`
+        : `Added to ${resolvedBarName}`
     );
-    setTimeout(() => setJustAddedMessage(null), 1500);
+    setTimeout(() => setJustAddedMessage(null), 1600);
 
     setName('');
     setNotes('');
+    setShowNotes(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -130,91 +209,144 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
     submitWithMode('update_existing');
   };
 
-  const applyPreset = (preset: DrinkItem, keepCurrentBar = true) => {
+  const applyPreset = (preset: DrinkItem, expandIfClosed = false) => {
     setName(preset.name);
     setCategory(preset.category);
     setVolumeMl(preset.volumeMl);
-    setAbv(preset.abv);
+    setAbvText(String(preset.abv));
     setPrice(preset.price);
     setNotes(preset.notes || '');
-    if (!keepCurrentBar && preset.barName) {
+    if (!barName.trim() && preset.barName) {
       setBarName(preset.barName);
-    } else if (!barName.trim() && preset.barName) {
-      setBarName(preset.barName);
+    }
+    if (expandIfClosed && !isExpanded) {
+      setIsExpanded(true);
     }
   };
 
-  const volumeChips = [
-    { label: '200ml (Fluitje)', val: 200 },
-    { label: '250ml (Vaasje)', val: 250 },
-    { label: '330ml (Flesje)', val: 330 },
-    { label: '500ml (Pint)', val: 500 },
-    { label: '568ml (UK Pint)', val: 568 },
-    { label: '1.5L (Pitcher)', val: 1500 },
-    { label: '150ml (Wine)', val: 150 },
-    { label: '35ml (Shot)', val: 35 },
-  ];
+  const volumeChips = VOLUME_CHIPS_BY_CATEGORY[category];
+  const abvChips = ABV_CHIPS_BY_CATEGORY[category];
+  const priceChips = [3.0, 4.0, 5.0, 6.5];
 
-  const abvChips = [4.5, 5.0, 5.5, 6.5, 8.0, 8.5, 10.0, 12.5, 40.0];
+  // Compact collapsed bar: keeps Leaderboard at the top of the screen
+  if (!isExpanded) {
+    return (
+      <div
+        id="tour-drink-presets"
+        className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl px-3 py-2.5 sm:px-4 shadow-sm flex items-center gap-2.5 overflow-hidden"
+      >
+        <button
+          type="button"
+          onClick={() => openForm(true)}
+          className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer"
+        >
+          <Plus className="w-4 h-4 stroke-[2.75]" />
+          <span>Add Drink</span>
+        </button>
 
-  return (
-    <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 sm:p-6 shadow-sm relative overflow-hidden">
-      {/* Background ambient glow matching inspiration card aesthetic */}
-      <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-[#FF8A8E]/15 dark:bg-[#F21B2D]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="h-5 w-px bg-[#E4E4E7] dark:bg-[#27272A] shrink-0" />
 
-      {/* Header & Quick Bar Presets */}
-      <div id="tour-drink-presets" className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 mb-4">
-        <div>
-          <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF] flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#F21B2D] animate-pulse" />
-            Add Drink to Compare
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Compare pure alcohol vs price for your current bar. Duplicates per bar are automatically detected.
-          </p>
-        </div>
-
-        {/* 1-tap presets bar */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider whitespace-nowrap mr-1">
-            Templates:
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 flex-1 py-0.5">
+          <span className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500 shrink-0 hidden sm:inline mr-0.5">
+            Quick:
           </span>
-          {[
-            { label: 'Vaasje (25cl)', preset: POPULAR_BAR_PRESETS[0] },
-            { label: 'Pint (50cl)', preset: POPULAR_BAR_PRESETS[1] },
-            { label: 'Fluitje (20cl)', preset: POPULAR_BAR_PRESETS[2] },
-            { label: 'Tripel (8.5%)', preset: POPULAR_BAR_PRESETS[3] },
-            { label: 'IPA (6.5%)', preset: POPULAR_BAR_PRESETS[4] },
-            { label: 'Pitcher (1.5L)', preset: POPULAR_BAR_PRESETS[6] },
-          ].map(({ label, preset }) => (
+          {QUICK_TEMPLATES.map(({ label, preset }) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => applyPreset(preset, true)}
-              className="px-2.5 py-1 text-xs font-medium rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/25 dark:hover:bg-[#FF8A8E]/20 hover:text-[#D91424] dark:hover:text-[#FF8A8E] text-[#18181B] dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A] transition-colors whitespace-nowrap"
+              className="shrink-0 px-2.5 py-1.5 text-xs font-medium rounded-xl bg-[#FAFAFA] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] hover:text-[#D91424] dark:hover:text-[#FF8A8E] text-zinc-700 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A] transition-colors whitespace-nowrap cursor-pointer"
             >
               {label}
             </button>
           ))}
         </div>
+
+        <button
+          type="button"
+          onClick={() => openForm(true)}
+          aria-label="Expand add drink form"
+          className="shrink-0 hidden sm:inline-flex items-center justify-center w-8 h-8 rounded-xl text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#27272A] transition-colors cursor-pointer"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      id="tour-drink-presets"
+      className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-3.5 sm:p-4 shadow-sm"
+    >
+      {/* Compact Header: Title + Bar pill + Quick Templates + Collapse */}
+      <div className="flex flex-col gap-2.5 mb-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <h2 className="text-sm sm:text-base font-extrabold tracking-[-0.02em] text-[#18181B] dark:text-[#FFFFFF]">
+              Add Drink
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowBarPicker((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer max-w-full ${
+                showBarPicker
+                  ? 'bg-[#FFF2F3] dark:bg-[#F21B2D]/15 text-[#D91424] dark:text-[#FF8A8E] border-[#F21B2D]/40'
+                  : 'bg-[#FAFAFA] dark:bg-[#121214] text-zinc-600 dark:text-zinc-300 border-[#E4E4E7] dark:border-[#27272A] hover:border-zinc-300 dark:hover:border-zinc-600'
+              }`}
+              title="Change target bar"
+            >
+              <Store className="w-3 h-3 text-[#F21B2D] shrink-0" />
+              <span className="truncate max-w-[160px] sm:max-w-[220px]">{resolvedBarName}</span>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-normal">
+                {showBarPicker ? 'Hide' : 'Change'}
+              </span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-[#27272A] transition-colors cursor-pointer"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+            <span>Hide</span>
+          </button>
+        </div>
+
+        {/* Single-line scrollable template pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <span className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider shrink-0 mr-0.5">
+            Quick:
+          </span>
+          {QUICK_TEMPLATES.map(({ label, preset }) => {
+            const isMatchingPreset =
+              name === preset.name && volumeMl === preset.volumeMl && abv === preset.abv;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyPreset(preset)}
+                className={`shrink-0 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors whitespace-nowrap cursor-pointer ${
+                  isMatchingPreset
+                    ? 'bg-[#FFF2F3] dark:bg-[#F21B2D]/15 text-[#D91424] dark:text-[#FF8A8E] border-[#F21B2D]/40 font-semibold'
+                    : 'bg-[#FAFAFA] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] text-zinc-600 dark:text-zinc-300 border-[#E4E4E7] dark:border-[#27272A]'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* BAR NAME & VENUE ROW */}
-        <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <label
-              htmlFor="bar-name-input"
-              className="text-xs font-bold text-[#F21B2D] uppercase tracking-wider flex items-center gap-1.5 shrink-0"
-            >
-              <Store className="w-3.5 h-3.5 text-[#F21B2D]" />
-              <span>Which Bar are you sitting at? *</span>
-            </label>
-
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {/* Optional Inline Bar Picker (only shown when user clicks "Change") */}
+        {showBarPicker && (
+          <div className="bg-[#FAFAFA] dark:bg-[#121214] p-2.5 rounded-xl border border-[#E4E4E7] dark:border-[#27272A] space-y-2">
             {availableBars.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase mr-1">Known Bars:</span>
-                {availableBars.slice(0, 4).map((b) => (
+                {availableBars.slice(0, 5).map((b) => (
                   <button
                     key={b}
                     type="button"
@@ -222,16 +354,16 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                       setBarName(b);
                       onSelectBar(b);
                     }}
-                    className={`text-[10px] px-2.5 py-0.5 rounded-lg font-medium border transition-colors whitespace-nowrap ${
+                    className={`text-[11px] px-2.5 py-0.5 rounded-lg font-medium border transition-colors whitespace-nowrap cursor-pointer ${
                       areBarNamesEquivalent(barName, b)
-                        ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white border-[#F21B2D] font-bold'
-                        : 'bg-[#FFFFFF] dark:bg-[#18181B] text-zinc-600 dark:text-zinc-400 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
+                        ? 'bg-[#F21B2D] text-white border-[#F21B2D] font-semibold'
+                        : 'bg-[#FFFFFF] dark:bg-[#18181B] text-zinc-600 dark:text-zinc-300 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
                     }`}
                   >
                     {b}
                   </button>
                 ))}
-                {availableBars.length > 4 && (
+                {availableBars.length > 5 && (
                   <select
                     value={availableBars.some((b) => areBarNamesEquivalent(barName, b)) ? resolvedBarName : ''}
                     onChange={(e) => {
@@ -241,9 +373,9 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                       }
                     }}
                     aria-label="All known bars"
-                    className="text-[10px] px-2 py-0.5 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] text-[#F21B2D] border border-[#E4E4E7] dark:border-[#27272A] font-semibold focus:outline-none focus:border-[#F21B2D]"
+                    className="text-[11px] px-2 py-0.5 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] text-[#F21B2D] border border-[#E4E4E7] dark:border-[#27272A] font-semibold focus:outline-none focus:border-[#F21B2D]"
                   >
-                    <option value="">+{availableBars.length - 4} more bars...</option>
+                    <option value="">+{availableBars.length - 5} more...</option>
                     {availableBars.map((b) => (
                       <option key={b} value={b}>
                         {b}
@@ -253,18 +385,15 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 )}
               </div>
             )}
-          </div>
-
-          <div className="flex items-center gap-2">
             <input
               id="bar-name-input"
               list="known-bars-datalist"
               type="text"
               value={barName}
               onChange={(e) => setBarName(e.target.value)}
-              placeholder="e.g. Café De Dokter, Gollem, The Waterhole..."
+              placeholder="Bar / venue name..."
               required
-              className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] font-medium text-xs sm:text-sm rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] font-medium text-xs sm:text-sm rounded-xl px-3 py-1.5 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
             <datalist id="known-bars-datalist">
               {availableBars.map((b) => (
@@ -272,114 +401,113 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               ))}
             </datalist>
           </div>
-        </div>
+        )}
 
-        {/* Drink Name, Notes & Category */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          <div className="md:col-span-5">
-            <label
-              htmlFor="drink-name"
-              className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5"
-            >
-              Drink Name / Label *
-            </label>
+        {/* Row 1: Drink Name + Compact Category Strip */}
+        <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
+          <div className="flex-1 min-w-0">
             <input
+              ref={nameInputRef}
               id="drink-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Heineken Vaasje, Tripel Karmeliet..."
+              placeholder="Drink name (e.g. Heineken Vaasje, Tripel Karmeliet...)"
+              aria-label="Drink name"
               required
-              className="w-full bg-[#FFFFFF] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-3.5 py-2.5 text-sm border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] focus:ring-1 focus:ring-[#F21B2D] transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              className="w-full bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-3.5 py-2 text-sm font-medium border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] focus:bg-[#FFFFFF] dark:focus:bg-[#18181B] transition-colors placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label
-              htmlFor="drink-notes"
-              className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5"
-            >
-              Notes (Opt.)
-            </label>
+          <div
+            className="flex items-center gap-1 overflow-x-auto no-scrollbar shrink-0 py-0.5"
+            role="radiogroup"
+            aria-label="Drink category"
+          >
+            {DRINK_CATEGORY_LIST.map((cat) => {
+              const isSelected = category === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => setCategory(cat.id)}
+                  className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-semibold border transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#F21B2D] border-[#F21B2D] text-white'
+                      : 'bg-[#FAFAFA] dark:bg-[#121214] border-[#E4E4E7] dark:border-[#27272A] text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white'
+                  }`}
+                >
+                  <CategoryIcon
+                    category={cat.id}
+                    className="w-3.5 h-3.5"
+                    colored={!isSelected}
+                  />
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Optional Note input (shown on click) */}
+        {showNotes && (
+          <div className="flex items-center gap-2">
             <input
               id="drink-notes"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. Draft, Bottle"
-              className="w-full bg-[#FFFFFF] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-3 py-2.5 text-sm border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] transition-all placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              placeholder="Optional note (e.g. Draft, Bottle, Happy Hour...)"
+              aria-label="Optional notes"
+              className="flex-1 bg-[#FAFAFA] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-3 py-1.5 text-xs border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D] placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
             />
+            <button
+              type="button"
+              onClick={() => {
+                setNotes('');
+                setShowNotes(false);
+              }}
+              aria-label="Remove note"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-[#27272A] cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-
-          <div className="md:col-span-5">
-            <label className="block text-xs font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-1.5">
-              Category
-            </label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-3 gap-1.5">
-              {DRINK_CATEGORY_LIST.map((cat) => {
-                const isSelected = category === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategory(cat.id)}
-                    className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl text-[11px] font-semibold transition-all border ${
-                      isSelected
-                        ? 'bg-[#F21B2D] hover:bg-[#D91424] border-[#F21B2D] text-white shadow-sm'
-                        : 'bg-[#FFF2F3]/50 dark:bg-[#121214] border-[#E4E4E7] dark:border-[#27272A] text-zinc-600 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white hover:bg-[#FF8A8E]/15 dark:hover:bg-[#27272A]'
-                    }`}
-                  >
-                    <CategoryIcon
-                      category={cat.id}
-                      className="w-3.5 h-3.5"
-                      colored={!isSelected}
-                    />
-                    <span className="truncate">{cat.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Live Per-Bar Duplicate Detection Alert */}
         {duplicateCheck && (
           <div
-            className={`p-3 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+            className={`px-3 py-2 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
               duplicateCheck.matchType === 'exact' || duplicateCheck.matchType === 'same_variant'
-                ? 'bg-[#FF8A8E]/15 dark:bg-[#F21B2D]/10 border-[#FF8A8E]/50 dark:border-[#F21B2D]/40 text-[#18181B] dark:text-zinc-100'
-                : 'bg-[#FFF2F3]/60 dark:bg-[#121214] border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-zinc-300'
+                ? 'bg-[#FFF2F3] dark:bg-[#F21B2D]/10 border-[#FF8A8E]/50 dark:border-[#F21B2D]/40 text-[#18181B] dark:text-zinc-100'
+                : 'bg-[#FAFAFA] dark:bg-[#121214] border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-zinc-300'
             }`}
           >
             <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-[#F21B2D] shrink-0 mt-0.5" />
+              <AlertTriangle className="w-3.5 h-3.5 text-[#F21B2D] shrink-0 mt-0.5" />
               <div>
                 {duplicateCheck.matchType === 'exact' && (
                   <span>
-                    <strong>Exact duplicate at {resolvedBarName}:</strong> &ldquo;
+                    <strong>Already on {resolvedBarName}:</strong> &ldquo;
                     {duplicateCheck.existingDrink.name}&rdquo; ({duplicateCheck.existingDrink.volumeMl}
                     ml, {duplicateCheck.existingDrink.abv}%,{' '}
-                    {formatCurrency(duplicateCheck.existingDrink.price, currency)}) is already on
-                    this bar&apos;s menu.
+                    {formatCurrency(duplicateCheck.existingDrink.price, currency)}).
                   </span>
                 )}
                 {duplicateCheck.matchType === 'same_variant' && (
                   <span>
-                    <strong>Already on menu at {resolvedBarName}:</strong> &ldquo;
-                    {duplicateCheck.existingDrink.name}&rdquo; ({duplicateCheck.existingDrink.volumeMl}
-                    ml) is currently recorded at{' '}
-                    <strong>{formatCurrency(duplicateCheck.existingDrink.price, currency)}</strong> (
-                    {duplicateCheck.existingDrink.abv}% ABV). Submitting will update the existing
-                    entry for this bar.
+                    <strong>On {resolvedBarName} at {formatCurrency(duplicateCheck.existingDrink.price, currency)}:</strong>{' '}
+                    submitting updates this {duplicateCheck.existingDrink.volumeMl}ml entry.
                   </span>
                 )}
                 {duplicateCheck.matchType === 'same_name_diff_volume' && (
                   <span>
-                    <strong>Same drink name at {resolvedBarName} with different size:</strong>{' '}
-                    &ldquo;{duplicateCheck.existingDrink.name}&rdquo; exists at{' '}
-                    {duplicateCheck.existingDrink.volumeMl}ml (
-                    {formatCurrency(duplicateCheck.existingDrink.price, currency)}). This will be
-                    added as a {volumeMl}ml size option.
+                    Exists at {resolvedBarName} in {duplicateCheck.existingDrink.volumeMl}ml (
+                    {formatCurrency(duplicateCheck.existingDrink.price, currency)}). Will add as{' '}
+                    {volumeMl}ml option.
                   </span>
                 )}
               </div>
@@ -387,32 +515,30 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
 
             {(duplicateCheck.matchType === 'exact' ||
               duplicateCheck.matchType === 'same_variant') && (
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => submitWithMode('force_add')}
-                  className="px-2.5 py-1.5 rounded-xl bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-zinc-50 dark:hover:bg-[#27272A] text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] text-[11px] font-semibold transition-colors whitespace-nowrap"
-                >
-                  Add as Separate Item Anyway
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => submitWithMode('force_add')}
+                className="shrink-0 self-start sm:self-auto px-2.5 py-1 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-zinc-50 dark:hover:bg-[#27272A] text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer"
+              >
+                Add Separately
+              </button>
             )}
           </div>
         )}
 
-        {/* 3 Core Numeric Inputs: Volume, ABV, Price */}
+        {/* Row 2: 3 Clean Numeric Inputs (Volume, ABV, Price) without nested cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Volume */}
-          <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A]">
-            <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="drink-volume" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Volume (ml) *
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="drink-volume" className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                Volume (ml)
               </label>
-              <span className="text-[11px] text-[#F21B2D] tabular-nums font-bold">
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums font-medium">
                 {volumeMl ? `${(volumeMl / 10).toFixed(0)} cl` : '0 cl'}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[#FAFAFA] dark:bg-[#121214] border border-[#E4E4E7] dark:border-[#27272A] focus-within:border-[#F21B2D] focus-within:bg-[#FFFFFF] dark:focus-within:bg-[#18181B] rounded-xl px-3 py-1.5 transition-colors">
               <input
                 id="drink-volume"
                 type="number"
@@ -422,22 +548,20 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 value={volumeMl || ''}
                 onChange={(e) => setVolumeMl(parseFloat(e.target.value) || 0)}
                 required
-                className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-extrabold tracking-[-0.02em] text-base rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                className="w-full bg-transparent text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-bold text-sm focus:outline-none"
               />
-              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">ml</span>
+              <span className="text-xs font-medium text-zinc-400 ml-1.5">ml</span>
             </div>
-
-            {/* Quick volume chips */}
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="grid grid-cols-4 gap-1 mt-1.5">
               {volumeChips.map((chip) => (
                 <button
                   key={chip.val}
                   type="button"
                   onClick={() => setVolumeMl(chip.val)}
-                  className={`text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                  className={`text-[10px] py-0.5 rounded-lg font-medium border transition-colors truncate cursor-pointer ${
                     volumeMl === chip.val
-                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold'
-                      : 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]'
+                      ? 'bg-[#F21B2D] text-white border-[#F21B2D] font-bold'
+                      : 'bg-transparent text-zinc-500 dark:text-zinc-400 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
                   }`}
                 >
                   {chip.label}
@@ -447,41 +571,40 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           </div>
 
           {/* ABV % */}
-          <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A]">
-            <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="drink-abv" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                ABV (%) *
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="drink-abv" className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                Alcohol (ABV %)
               </label>
-              <span className="text-[11px] text-[#F21B2D] tabular-nums font-bold">
+              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 tabular-nums font-medium">
                 {abv ? `${abv.toFixed(1)}%` : '0%'}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[#FAFAFA] dark:bg-[#121214] border border-[#E4E4E7] dark:border-[#27272A] focus-within:border-[#F21B2D] focus-within:bg-[#FFFFFF] dark:focus-within:bg-[#18181B] rounded-xl px-3 py-1.5 transition-colors">
               <input
                 id="drink-abv"
                 type="number"
                 min="0"
                 max="100"
                 step="0.1"
-                value={abv || ''}
-                onChange={(e) => setAbv(parseFloat(e.target.value) || 0)}
+                placeholder="0"
+                value={abvText}
+                onChange={(e) => setAbvText(e.target.value)}
                 required
-                className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-extrabold tracking-[-0.02em] text-base rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                className="w-full bg-transparent text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-bold text-sm focus:outline-none"
               />
-              <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">%</span>
+              <span className="text-xs font-medium text-zinc-400 ml-1.5">%</span>
             </div>
-
-            {/* Quick ABV chips */}
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="grid grid-cols-4 gap-1 mt-1.5">
               {abvChips.map((chip) => (
                 <button
                   key={chip}
                   type="button"
-                  onClick={() => setAbv(chip)}
-                  className={`text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors ${
-                    abv === chip
-                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold'
-                      : 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]'
+                  onClick={() => setAbvText(String(chip))}
+                  className={`text-[10px] py-0.5 rounded-lg font-medium border transition-colors cursor-pointer ${
+                    abvText.trim() !== '' && abv === chip
+                      ? 'bg-[#F21B2D] text-white border-[#F21B2D] font-bold'
+                      : 'bg-transparent text-zinc-500 dark:text-zinc-400 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
                   }`}
                 >
                   {chip}%
@@ -491,16 +614,16 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           </div>
 
           {/* Price */}
-          <div className="bg-[#FFF2F3]/60 dark:bg-[#121214] p-3 rounded-xl border border-[#E4E4E7] dark:border-[#27272A]">
-            <div className="flex items-center justify-between mb-1.5">
-              <label htmlFor="drink-price" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Price ({currency}) *
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="drink-price" className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                Price ({currency})
               </label>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setPrice((p) => Math.max(0.5, Number((p - 0.5).toFixed(2))))}
-                  className="px-1.5 py-0.5 text-[10px] rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-zinc-700 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]"
+                  className="px-1.5 text-[10px] leading-4 rounded border border-[#E4E4E7] dark:border-[#27272A] text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white cursor-pointer"
                   title="Minus 0.50"
                 >
                   -0.50
@@ -508,15 +631,15 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setPrice((p) => Number((p + 0.5).toFixed(2)))}
-                  className="px-1.5 py-0.5 text-[10px] rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-zinc-700 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]"
+                  className="px-1.5 text-[10px] leading-4 rounded border border-[#E4E4E7] dark:border-[#27272A] text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white cursor-pointer"
                   title="Plus 0.50"
                 >
                   +0.50
                 </button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[#F21B2D]">{currency}</span>
+            <div className="flex items-center bg-[#FAFAFA] dark:bg-[#121214] border border-[#E4E4E7] dark:border-[#27272A] focus-within:border-[#F21B2D] focus-within:bg-[#FFFFFF] dark:focus-within:bg-[#18181B] rounded-xl px-3 py-1.5 transition-colors">
+              <span className="text-xs font-semibold text-zinc-400 mr-1.5">{currency}</span>
               <input
                 id="drink-price"
                 type="number"
@@ -526,21 +649,19 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
                 value={price || ''}
                 onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
                 required
-                className="w-full bg-[#FFFFFF] dark:bg-[#18181B] text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-extrabold tracking-[-0.02em] text-base rounded-xl px-3 py-2 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                className="w-full bg-transparent text-[#18181B] dark:text-[#FFFFFF] tabular-nums font-bold text-sm focus:outline-none"
               />
             </div>
-
-            {/* Quick Price chips */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {[3.0, 3.5, 4.0, 5.0, 6.0, 7.5, 9.0].map((pVal) => (
+            <div className="grid grid-cols-4 gap-1 mt-1.5">
+              {priceChips.map((pVal) => (
                 <button
                   key={pVal}
                   type="button"
                   onClick={() => setPrice(pVal)}
-                  className={`text-[10px] px-2 py-0.5 rounded-lg font-medium transition-colors ${
+                  className={`text-[10px] py-0.5 rounded-lg font-medium border transition-colors truncate cursor-pointer ${
                     price === pVal
-                      ? 'bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold'
-                      : 'bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/15 text-zinc-600 dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A]'
+                      ? 'bg-[#F21B2D] text-white border-[#F21B2D] font-bold'
+                      : 'bg-transparent text-zinc-500 dark:text-zinc-400 border-[#E4E4E7] dark:border-[#27272A] hover:text-[#18181B] dark:hover:text-white'
                   }`}
                 >
                   {formatCurrency(pVal, currency)}
@@ -550,38 +671,42 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
           </div>
         </div>
 
-        {/* Live Calculation Preview Banner & Add/Update Button */}
-        <div className="bg-gradient-to-r from-[#FFF2F3] via-[#FFFFFF] to-[#FFF2F3] dark:from-[#121214] dark:via-[#18181B] dark:to-[#121214] rounded-xl p-3 border border-[#E4E4E7] dark:border-[#27272A] flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Pure Alcohol:</span>
-              <span className="text-[#18181B] dark:text-[#FFFFFF] font-bold text-sm tabular-nums tracking-[-0.01em]">
-                {preview.pureAlcoholMl} ml ({preview.standardDrinks} std)
+        {/* Footer: Compact Live Score + Optional Note Toggle + Submit */}
+        <div className="pt-2.5 border-t border-[#E4E4E7] dark:border-[#27272A] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <div className="flex items-baseline gap-1">
+              <span className="text-zinc-500 dark:text-zinc-400">Score:</span>
+              <span className="text-[#F21B2D] font-extrabold text-sm tabular-nums">
+                {preview.pureAlcoholPerCurrency} ml/{currency}
               </span>
             </div>
+            <span className="text-zinc-300 dark:text-zinc-700">·</span>
+            <span className="text-zinc-500 dark:text-zinc-400 tabular-nums">
+              {preview.pureAlcoholMl} ml alc ({preview.standardDrinks} std)
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700 hidden sm:inline">·</span>
+            <span className="text-zinc-500 dark:text-zinc-400 tabular-nums hidden sm:inline">
+              {formatCurrency(preview.costPerStandardDrink, currency)}/std
+            </span>
 
-            <div className="h-4 w-px bg-[#E4E4E7] dark:bg-[#27272A]" />
-
-            <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">KrentProcent:</span>
-              <span className="text-[#F21B2D] font-extrabold text-sm tabular-nums tracking-[-0.02em]">
-                {preview.pureAlcoholPerCurrency} ml / {currency}
-              </span>
-            </div>
-
-            <div className="h-4 w-px bg-[#E4E4E7] dark:bg-[#27272A] hidden sm:block" />
-
-            <div className="hidden sm:flex items-center gap-1.5">
-              <span className="text-zinc-500 dark:text-zinc-400 font-medium">Cost / Std Drink:</span>
-              <span className="text-[#18181B] dark:text-zinc-200 font-bold tabular-nums">
-                {formatCurrency(preview.costPerStandardDrink, currency)}
-              </span>
-            </div>
+            {!showNotes && (
+              <>
+                <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                <button
+                  type="button"
+                  onClick={() => setShowNotes(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  <StickyNote className="w-3 h-3" />
+                  <span>{notes ? `Note: ${notes}` : '+ Note'}</span>
+                </button>
+              </>
+            )}
           </div>
 
           <button
             type="submit"
-            className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-sm ${
+            className={`w-full sm:w-auto px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
               justAddedMessage
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 : 'bg-[#F21B2D] hover:bg-[#D91424] text-white'
@@ -596,13 +721,13 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               (duplicateCheck.matchType === 'exact' ||
                 duplicateCheck.matchType === 'same_variant') ? (
               <>
-                <RefreshCw className="w-4 h-4 stroke-[2.5]" />
-                <span>Update Existing at {resolvedBarName}</span>
+                <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Update at {resolvedBarName}</span>
               </>
             ) : (
               <>
-                <Plus className="w-4 h-4 stroke-[3]" />
-                <span>Add &amp; Calculate</span>
+                <Plus className="w-4 h-4 stroke-[2.75]" />
+                <span>Add Drink</span>
               </>
             )}
           </button>

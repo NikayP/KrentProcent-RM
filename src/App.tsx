@@ -21,17 +21,16 @@ import { DrinkForm } from './components/DrinkForm';
 import { Leaderboard } from './components/Leaderboard';
 import { ConfirmModal } from './components/ConfirmModal';
 import type { SyncStatus } from './types/account';
+import type { BarsSubTab } from './components/bars/BarsHub';
+import { usePublicBarsSync } from './hooks/usePublicBarsSync';
 
 const loadMenuScanner = () =>
   import('./components/MenuScanner').then((m) => ({ default: m.MenuScanner }));
-const loadCrossBarComparison = () =>
-  import('./components/CrossBarComparison').then((m) => ({ default: m.CrossBarComparison }));
+const loadBarsHub = () =>
+  import('./components/bars/BarsHub').then((m) => ({ default: m.BarsHub }));
 
 const MenuScanner = lazy(loadMenuScanner);
-const CrossBarComparison = lazy(loadCrossBarComparison);
-const AccountModal = lazy(() =>
-  import('./components/AccountModal').then((m) => ({ default: m.AccountModal }))
-);
+const BarsHub = lazy(loadBarsHub);
 const QuickTourModal = lazy(() =>
   import('./components/QuickTourModal').then((m) => ({ default: m.QuickTourModal }))
 );
@@ -54,11 +53,11 @@ import {
   saveUserData,
   deleteOwnAccount,
 } from './utils/supabase';
-import { ShieldCheck, Info, Check, Sparkles } from 'lucide-react';
+import { ShieldCheck, Info, Check, Sparkles, HelpCircle } from 'lucide-react';
 
-const STORAGE_KEY = 'krentprocent_rm_drinks_v2';
-const MANAGED_BARS_KEY = 'krentprocent_rm_bars_v2';
-const ACTIVE_BAR_KEY = 'krentprocent_rm_active_bar_v2';
+const STORAGE_KEY = 'krentprocent_drinks_v2';
+const MANAGED_BARS_KEY = 'krentprocent_bars_v2';
+const ACTIVE_BAR_KEY = 'krentprocent_active_bar_v2';
 const TOUR_STORAGE_KEY = 'krentprocent_has_seen_tour_v1';
 const THEME_STORAGE_KEY = 'krentprocent_theme_v1';
 const DIRTY_STORAGE_KEY = 'krentprocent_account_dirty_v1';
@@ -153,6 +152,48 @@ export default function App() {
     return 'calculator';
   });
 
+  const [barsSubTab, setBarsSubTab] = useState<BarsSubTab>(() => {
+    if (typeof window === 'undefined') return 'my-bars';
+    const subParam = new URLSearchParams(window.location.search).get('sub');
+    if (subParam === 'discover' || subParam === 'account' || subParam === 'my-bars') {
+      return subParam;
+    }
+    return 'my-bars';
+  });
+
+  const [discoverQuery, setDiscoverQuery] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('q') || '';
+  });
+
+  // Sync sub-tab & ?q= URL params cleanly so Discover links (e.g. ?tab=bars&sub=discover&q=@jan) are shareable
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (activeTab === 'bars') {
+      url.searchParams.set('tab', 'bars');
+      if (barsSubTab !== 'my-bars') url.searchParams.set('sub', barsSubTab);
+      else url.searchParams.delete('sub');
+      if (barsSubTab === 'discover' && discoverQuery.trim()) {
+        url.searchParams.set('q', discoverQuery.trim());
+      } else {
+        url.searchParams.delete('q');
+      }
+    } else {
+      url.searchParams.delete('sub');
+      url.searchParams.delete('q');
+      if (url.searchParams.has('tab')) {
+        url.searchParams.set('tab', activeTab);
+      }
+    }
+    const nextSearch = url.searchParams.toString();
+    const nextRelative = url.pathname + (nextSearch ? `?${nextSearch}` : '') + url.hash;
+    const currentRelative = window.location.pathname + window.location.search + window.location.hash;
+    if (nextRelative !== currentRelative) {
+      window.history.replaceState(window.history.state, '', nextRelative);
+    }
+  }, [activeTab, barsSubTab, discoverQuery]);
+
   const isOnline = useOnlineStatus();
   const { canInstall, promptInstall } = useInstallPrompt();
 
@@ -240,7 +281,6 @@ export default function App() {
   const [username, setUsername] = useState<string | null>(null);
   const [syncReady, setSyncReady] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
-  const [isAccountOpen, setIsAccountOpen] = useState<boolean>(false);
   const [isRecovery, setIsRecovery] = useState<boolean>(false);
 
   const drinksRef = useRef(drinks);
@@ -288,7 +328,6 @@ export default function App() {
     Boolean(barPendingDelete) ||
     resetPending ||
     deleteAccountPending ||
-    isAccountOpen ||
     isTourOpen;
   const pushedModalHistoryRef = useRef(false);
   const closingFromPopstateRef = useRef(false);
@@ -319,17 +358,14 @@ export default function App() {
       if (deleteAccountPending) setDeleteAccountPending(false);
       else if (resetPending) setResetPending(false);
       else if (barPendingDelete) setBarPendingDelete(null);
-      else if (isAccountOpen) {
-        setIsAccountOpen(false);
-        if (isRecovery) setIsRecovery(false);
-      } else if (isTourOpen) {
+      else if (isTourOpen) {
         handleCloseTour();
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [deleteAccountPending, resetPending, barPendingDelete, isAccountOpen, isRecovery, isTourOpen]);
+  }, [deleteAccountPending, resetPending, barPendingDelete, isTourOpen]);
 
   // Ask browser for persistent storage once so local drinks aren't evicted under storage pressure
   const requestedPersistRef = useRef(false);
@@ -345,7 +381,7 @@ export default function App() {
   useEffect(() => {
     const prefetch = () => {
       void loadMenuScanner();
-      void loadCrossBarComparison();
+      void loadBarsHub();
     };
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
       const id = window.requestIdleCallback(prefetch, { timeout: 2500 });
@@ -374,6 +410,19 @@ export default function App() {
       setToastMessage((prev) => (prev === msg ? null : prev));
     }, duration);
   };
+
+  const {
+    shareState,
+    updatingBarKey,
+    setBarPublic,
+    handleBarRenamed: syncRenamedPublicBar,
+    handleBarDeleted: syncDeletedPublicBar,
+  } = usePublicBarsSync({
+    session,
+    syncReady,
+    drinks,
+    onShowToast: showToast,
+  });
 
   // Persist to localStorage
   useEffect(() => {
@@ -523,7 +572,8 @@ export default function App() {
 
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecovery(true);
-        setIsAccountOpen(true);
+        setBarsSubTab('account');
+        setActiveTab('bars');
       }
 
       if (!nextSession) {
@@ -737,6 +787,8 @@ export default function App() {
       setActiveBar(renameResult.canonicalNewName);
     }
 
+    syncRenamedPublicBar(oldName, renameResult.canonicalNewName, renameResult.drinks);
+
     if (renameResult.mergedDuplicatesRemoved > 0) {
       showToast(
         `Merged "${oldName}" into "${renameResult.canonicalNewName}" (${renameResult.mergedDuplicatesRemoved} duplicate drink(s) consolidated).`
@@ -777,8 +829,35 @@ export default function App() {
       setActiveBar('all');
     }
 
+    syncDeletedPublicBar(barNameToDelete);
     showToast(`Deleted "${barNameToDelete}" and all of its drinks.`);
     setBarPendingDelete(null);
+  };
+
+  const handleAdoptPublicBar = (
+    incomingDrinks: DrinkItem[],
+    sourceUsername: string,
+    barName: string
+  ) => {
+    const merged = mergeDrinksBatch(drinks, incomingDrinks, 'update', availableBars);
+    setDrinks(merged.drinks);
+
+    const canonicalTarget = canonicalizeBarName(
+      barName,
+      getUniqueBars(merged.drinks, managedBars)
+    );
+    setManagedBars((prev) => getUniqueBars([], [...prev, canonicalTarget]));
+    setActiveBar(canonicalTarget);
+
+    triggerHaptic(12);
+    if (merged.updatedCount > 0) {
+      showToast(
+        `Updated "${canonicalTarget}" from @${sourceUsername} (${merged.addedCount} added, ${merged.updatedCount} updated).`
+      );
+    } else {
+      showToast(`Added "${canonicalTarget}" from @${sourceUsername}!`);
+    }
+    switchTab('calculator');
   };
 
   const pendingBarDrinksCount = useMemo(() => {
@@ -817,6 +896,38 @@ export default function App() {
       'Account'
     : null;
 
+  const sharedAccountProps = {
+    session,
+    username,
+    syncStatus,
+    isRecovery,
+    onRecoveryComplete: () => {
+      setIsRecovery(false);
+      if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname + window.location.search
+        );
+      }
+    },
+    onBeforeAuth: (mode: 'login' | 'register') => {
+      pendingAuthModeRef.current = mode;
+    },
+    onAuthErrorReset: () => {
+      pendingAuthModeRef.current = null;
+    },
+    onRequestDeleteAccount: () => setDeleteAccountPending(true),
+    onUsernameChanged: (newName: string) => setUsername(newName),
+    onShowToast: showToast,
+    localDrinkCount: drinks.length,
+  };
+
+  const openAccountTab = useCallback(() => {
+    setBarsSubTab('account');
+    switchTab('bars');
+  }, [switchTab]);
+
   const handleInstallApp = async () => {
     const outcome = await promptInstall();
     if (outcome === 'accepted') {
@@ -843,7 +954,8 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         accountName={accountDisplayName}
         syncStatus={syncStatus}
-        onOpenAccount={isAccountsEnabled ? () => setIsAccountOpen(true) : undefined}
+        onOpenAccount={isAccountsEnabled ? openAccountTab : undefined}
+        isAccountActive={activeTab === 'bars' && barsSubTab === 'account'}
         canInstall={canInstall}
         onInstallApp={handleInstallApp}
         isOnline={isOnline}
@@ -899,17 +1011,29 @@ export default function App() {
           </Suspense>
         )}
 
-        {/* TAB 3: Compare & Manage Bars */}
+        {/* TAB 3: My Bars, Discover & Account Hub */}
         {activeTab === 'bars' && (
           <Suspense fallback={<TabSkeleton />}>
-            <CrossBarComparison
+            <BarsHub
+              subTab={barsSubTab}
+              onSelectSubTab={setBarsSubTab}
+              discoverQuery={discoverQuery}
+              onDiscoverQueryChange={setDiscoverQuery}
+              isAccountsEnabled={isAccountsEnabled}
               drinks={drinks}
               extraBars={managedBars}
+              availableBars={availableBars}
               currency={currency}
               onSelectBar={handleSelectBarFromComparison}
               onAddBar={handleAddBar}
               onRenameBar={handleRenameBar}
               onDeleteBar={handleDeleteBar}
+              shareState={shareState}
+              updatingBarKey={updatingBarKey}
+              onSetBarPublic={setBarPublic}
+              accountDisplayName={accountDisplayName}
+              onAdoptBar={handleAdoptPublicBar}
+              accountProps={sharedAccountProps}
             />
           </Suspense>
         )}
@@ -948,50 +1072,8 @@ export default function App() {
         cancelLabel="Cancel"
         variant="danger"
         onConfirm={confirmDeleteAccount}
-        onCancel={() => {
-          setDeleteAccountPending(false);
-          setIsAccountOpen(true);
-        }}
+        onCancel={() => setDeleteAccountPending(false)}
       />
-
-      {/* Account & Cloud Sync Modal */}
-      {isAccountsEnabled && isAccountOpen && (
-        <Suspense fallback={null}>
-          <AccountModal
-            isOpen={isAccountOpen}
-            onClose={() => {
-              setIsAccountOpen(false);
-              if (isRecovery) {
-                setIsRecovery(false);
-              }
-            }}
-            session={session}
-            username={username}
-            syncStatus={syncStatus}
-            isRecovery={isRecovery}
-            onRecoveryComplete={() => {
-              setIsRecovery(false);
-              if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
-                window.history.replaceState(
-                  null,
-                  '',
-                  window.location.pathname + window.location.search
-                );
-              }
-            }}
-            onBeforeAuth={(mode) => {
-              pendingAuthModeRef.current = mode;
-            }}
-            onAuthErrorReset={() => {
-              pendingAuthModeRef.current = null;
-            }}
-            onRequestDeleteAccount={() => setDeleteAccountPending(true)}
-            onUsernameChanged={(newName) => setUsername(newName)}
-            onShowToast={showToast}
-            localDrinkCount={drinks.length}
-          />
-        </Suspense>
-      )}
 
       {/* Interactieve Snelle Rondleiding Modal */}
       {isTourOpen && (
@@ -1007,19 +1089,28 @@ export default function App() {
       {/* Footer & Fallback / Preset Restore Bar */}
       <footer className="mt-auto border-t border-[#E4E4E7] dark:border-[#27272A] bg-[#FFFFFF]/80 dark:bg-[#18181B]/90 pt-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:py-6 text-xs text-zinc-500 dark:text-zinc-400">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-zinc-600 dark:text-zinc-400">
+          <div className="flex flex-wrap items-center gap-3 text-zinc-600 dark:text-zinc-400">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-[#F21B2D]" />
-              <span>KrentProcent RM &bull; Mathematical Alcohol Efficiency Engine</span>
+              <span>KrentProcent &bull; Mathematical Alcohol Efficiency Engine</span>
             </div>
             <button
               type="button"
               onClick={handleLoadPresets}
-              className="text-[11px] text-[#F21B2D] hover:text-[#D91424] font-semibold underline flex items-center gap-1"
+              className="text-[11px] text-[#F21B2D] hover:text-[#D91424] font-semibold underline flex items-center gap-1 cursor-pointer"
               title="Restore or merge standard preset bars and drinks"
             >
               <Sparkles className="w-3 h-3" />
               <span>Restore Presets</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsTourOpen(true)}
+              className="text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-[#18181B] dark:hover:text-white font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+              title="Replay the quick tour"
+            >
+              <HelpCircle className="w-3 h-3" />
+              <span>Quick Tour</span>
             </button>
           </div>
 
@@ -1038,7 +1129,6 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={switchTab}
         drinkCount={drinks.length}
-        barCount={availableBars.length}
       />
 
       {/* PWA Update Toast */}

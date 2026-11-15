@@ -5,14 +5,12 @@ interface BottomTabBarProps {
   activeTab: 'calculator' | 'scanner' | 'bars';
   onSelectTab: (tab: 'calculator' | 'scanner' | 'bars') => void;
   drinkCount: number;
-  barCount: number;
 }
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
   onSelectTab,
   drinkCount,
-  barCount,
 }) => {
   return (
     <nav
@@ -88,7 +86,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           </span>
         </button>
 
-        {/* Tab 3: Bars */}
+        {/* Tab 3: Bar Hub */}
         <button
           type="button"
           role="tab"
@@ -104,17 +102,6 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
             }`}
           >
             <Store className="w-4 h-4" />
-            {barCount > 0 && (
-              <span
-                className={`absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-extrabold tabular-nums flex items-center justify-center border ${
-                  activeTab === 'bars'
-                    ? 'bg-[#FFFFFF] text-[#F21B2D] border-[#F21B2D]'
-                    : 'bg-[#FFF2F3] dark:bg-[#27272A] text-zinc-700 dark:text-zinc-200 border-[#E4E4E7] dark:border-[#3F3F46]'
-                }`}
-              >
-                {barCount > 99 ? '99+' : barCount}
-              </span>
-            )}
           </span>
           <span
             className={`text-[11px] leading-tight transition-colors ${
@@ -123,7 +110,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
                 : 'font-semibold text-zinc-500 dark:text-zinc-400'
             }`}
           >
-            Bars
+            Bar Hub
           </span>
         </button>
       </div>

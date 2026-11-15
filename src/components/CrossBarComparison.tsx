@@ -4,7 +4,10 @@ import {
   calculateBarSummaries,
   findCrossBarCommonDrinks,
   formatCurrency,
+  normalizeBarKey,
 } from '../utils/calculator';
+import type { BarShareInfo } from '../hooks/usePublicBarsSync';
+import { ConfirmModal } from './ConfirmModal';
 import {
   Store,
   Trophy,
@@ -17,6 +20,9 @@ import {
   Beer,
   Coins,
   MapPin,
+  Lock,
+  Globe,
+  Loader2,
 } from 'lucide-react';
 
 interface CrossBarComparisonProps {
@@ -27,6 +33,12 @@ interface CrossBarComparisonProps {
   onAddBar?: (barName: string) => void;
   onRenameBar?: (oldName: string, newName: string) => void;
   onDeleteBar: (barName: string) => void;
+  canShare?: boolean;
+  shareState?: Record<string, BarShareInfo>;
+  updatingBarKey?: string | null;
+  onSetBarPublic?: (barName: string, isPublic: boolean, city: string | null) => void;
+  onPromptLogin?: () => void;
+  accountDisplayName?: string | null;
 }
 
 export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
@@ -37,10 +49,18 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
   onAddBar,
   onRenameBar,
   onDeleteBar,
+  canShare = false,
+  shareState = {},
+  updatingBarKey = null,
+  onSetBarPublic,
+  onPromptLogin,
+  accountDisplayName,
 }) => {
   const [newBarName, setNewBarName] = useState('');
   const [editingBar, setEditingBar] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [pendingPublicBar, setPendingPublicBar] = useState<string | null>(null);
+  const [cityDrafts, setCityDrafts] = useState<Record<string, string>>({});
 
   const summaries = calculateBarSummaries(drinks, extraBars);
   const commonDrinks = findCrossBarCommonDrinks(drinks);
@@ -133,6 +153,18 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
               Manage your recorded venues ({summaries.length}), rename or merge bars, and see which
               pub delivers the most alcohol for your money.
             </p>
+            {!canShare && onPromptLogin && (
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1.5">
+                <button
+                  type="button"
+                  onClick={onPromptLogin}
+                  className="font-semibold text-[#F21B2D] hover:underline"
+                >
+                  Log in
+                </button>{' '}
+                to share your bars with friends.
+              </p>
+            )}
           </div>
 
           {/* Add New Bar Form */}
@@ -214,6 +246,14 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
         {summaries.map((summary, idx) => {
           const isTop = idx === 0 && summary.drinkCount > 0;
           const isBeingRenamed = editingBar === summary.barName;
+          const barKey = normalizeBarKey(summary.barName);
+          const shareInfo = shareState[barKey];
+          const isPublic = Boolean(shareInfo?.isPublic);
+          const isUpdatingShare = updatingBarKey === barKey;
+          const cityValue =
+            cityDrafts[barKey] !== undefined ? cityDrafts[barKey] : shareInfo?.city || '';
+          const savedCity = shareInfo?.city || '';
+          const cityChanged = cityValue.trim() !== savedCity;
 
           return (
             <div
@@ -341,6 +381,76 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Sharing Controls (logged-in users) */}
+              {canShare && onSetBarPublic && (
+                <div className="mt-3 pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                      Visibility
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isUpdatingShare}
+                      onClick={() => {
+                        if (isPublic) {
+                          onSetBarPublic(summary.barName, false, null);
+                        } else {
+                          setPendingPublicBar(summary.barName);
+                        }
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors disabled:opacity-50 ${
+                        isPublic
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35 hover:bg-emerald-500/25'
+                          : 'bg-[#FFF2F3] dark:bg-[#121214] text-zinc-600 dark:text-zinc-300 border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D]/40'
+                      }`}
+                    >
+                      {isUpdatingShare ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : isPublic ? (
+                        <Globe className="w-3 h-3" />
+                      ) : (
+                        <Lock className="w-3 h-3" />
+                      )}
+                      <span>{isPublic ? 'Public' : 'Private'}</span>
+                    </button>
+                  </div>
+
+                  {isPublic && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        onSetBarPublic(summary.barName, true, cityValue);
+                      }}
+                      className="flex items-center gap-1.5"
+                    >
+                      <input
+                        type="text"
+                        value={cityValue}
+                        maxLength={60}
+                        onChange={(e) =>
+                          setCityDrafts((prev) => ({
+                            ...prev,
+                            [barKey]: e.target.value,
+                          }))
+                        }
+                        placeholder="City (optional, e.g. Utrecht)"
+                        aria-label={`City for ${summary.barName}`}
+                        className="flex-1 min-w-0 bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-white text-xs rounded-xl px-2.5 py-1.5 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
+                      />
+                      {cityChanged && (
+                        <button
+                          type="submit"
+                          disabled={isUpdatingShare}
+                          className="px-2.5 py-1.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white text-[11px] font-bold transition-colors shrink-0"
+                        >
+                          Save
+                        </button>
+                      )}
+                    </form>
+                  )}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2 mt-4">
@@ -478,6 +588,24 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={Boolean(pendingPublicBar)}
+        title={`Share "${pendingPublicBar}" Publicly?`}
+        message={`Anyone can see this bar's drinks and prices, together with your username${
+          accountDisplayName ? ` @${accountDisplayName.replace(/^@/, '')}` : ''
+        }.`}
+        confirmLabel="Make Public"
+        cancelLabel="Cancel"
+        variant="primary"
+        onConfirm={() => {
+          if (pendingPublicBar && onSetBarPublic) {
+            const key = normalizeBarKey(pendingPublicBar);
+            onSetBarPublic(pendingPublicBar, true, cityDrafts[key] ?? null);
+          }
+          setPendingPublicBar(null);
+        }}
+        onCancel={() => setPendingPublicBar(null)}
+      />
     </div>
   );
 };

@@ -10,7 +10,6 @@ import {
   filterDrinksByBar,
   calculateBarSummaries,
   deleteDrinksForBar,
-  normalizeBarKey,
   normalizeDrinkKey,
   areBarNamesEquivalent,
   areDrinkNamesEquivalent,
@@ -24,7 +23,6 @@ import {
   findCrossBarCommonDrinks,
   sanitizeDrinkItem,
   isExplicitZeroAlcohol,
-  matchKnownDrinkSpec,
   normalizeCafePrice,
 } from './calculator.ts';
 import type { DrinkItem } from './calculator.ts';

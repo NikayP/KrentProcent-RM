@@ -25,7 +25,6 @@ import {
 } from '../utils/calculator';
 import { parseMenuFallback } from '../utils/menuParser';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
 import {
   MAX_PAYLOAD_BYTES,
   classifyUpload,
@@ -475,22 +474,6 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     }
   };
 
-  const handleLoadSample = () => {
-    const sampleBar = canonicalizeBarName('De Bruine Kroeg', availableBars);
-    setTargetBar(sampleBar);
-    setTextInput(SAMPLE_MENU_TEXT);
-    setMode('text');
-    handleScan(SAMPLE_MENU_TEXT, sampleBar);
-  };
-
-  const handleLoadOperaSample = () => {
-    const operaBar = canonicalizeBarName('Café de Opera', availableBars);
-    setTargetBar(operaBar);
-    setTextInput(SAMPLE_OPERA_MENU_TEXT);
-    setMode('text');
-    handleScan(SAMPLE_OPERA_MENU_TEXT, operaBar);
-  };
-
   const toggleSelect = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
@@ -558,42 +541,17 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   return (
     <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 sm:p-6 shadow-sm space-y-6">
       {/* Header */}
-      <div id="tour-scanner-sample" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-xl bg-[#FF8A8E]/20 text-[#F21B2D]">
-              <Camera className="w-5 h-5" />
-            </span>
-            <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF]">Menu Photo &amp; PDF Scanner</h2>
-          </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Snap a photo of the pub chalkboard, upload a screenshot, or pick a PDF drinks menu. Our
-            AI extracts volume, ABV, and price and checks for duplicates at this bar!
-          </p>
+      <div id="tour-scanner-sample">
+        <div className="flex items-center gap-2">
+          <span className="p-1.5 rounded-xl bg-[#FF8A8E]/20 text-[#F21B2D]">
+            <Camera className="w-5 h-5" />
+          </span>
+          <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF]">Menu Photo &amp; PDF Scanner</h2>
         </div>
-
-        {/* 1-Click Sample Buttons */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={handleLoadOperaSample}
-            disabled={isScanning}
-            className="px-3.5 py-2 rounded-xl bg-[#FF8A8E]/20 hover:bg-[#FF8A8E]/30 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
-          >
-            <Sparkles className="w-4 h-4 text-[#F21B2D]" />
-            <span>Try Sample Café de Opera Menu</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleLoadSample}
-            disabled={isScanning}
-            className="px-3 py-2 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-300 border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap"
-          >
-            <Sparkles className="w-4 h-4 text-zinc-400" />
-            <span>De Bruine Kroeg</span>
-          </button>
-        </div>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+          Snap a photo of the pub chalkboard, upload a screenshot, or pick a PDF drinks menu. Our
+          AI extracts volume, ABV, and price and checks for duplicates at this bar!
+        </p>
       </div>
 
       {/* Target Bar Selector */}

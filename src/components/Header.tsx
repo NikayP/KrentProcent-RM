@@ -20,7 +20,7 @@ import {
   Download,
   WifiOff,
 } from 'lucide-react';
-import { DrinkItem, filterDrinksByBar, normalizeBarKey, DEFAULT_BAR_NAME } from '../utils/calculator';
+import { DrinkItem, filterDrinksByBar, normalizeBarKey } from '../utils/calculator';
 import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
@@ -40,6 +40,7 @@ interface HeaderProps {
   accountName?: string | null;
   syncStatus?: 'idle' | 'saving' | 'saved' | 'offline';
   onOpenAccount?: () => void;
+  isAccountActive?: boolean;
   canInstall?: boolean;
   onInstallApp?: () => void;
   isOnline?: boolean;
@@ -62,6 +63,7 @@ export const Header: React.FC<HeaderProps> = ({
   accountName,
   syncStatus,
   onOpenAccount,
+  isAccountActive = false,
   canInstall = false,
   onInstallApp,
   isOnline = true,
@@ -234,21 +236,28 @@ export const Header: React.FC<HeaderProps> = ({
                 id="tour-account-btn"
                 type="button"
                 onClick={onOpenAccount}
-                title={accountName ? `Account: ${accountName}` : 'Log in or create account'}
+                title={accountName ? `Manage account (${accountName})` : 'Log in or create account in Bar Hub'}
                 className={`px-2.5 py-1.5 sm:py-2 rounded-xl transition-colors border text-xs font-semibold flex items-center gap-1.5 max-w-[140px] ${
-                  accountName
-                    ? 'bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-white border-[#F21B2D]/40 hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A]'
-                    : 'bg-[#FFF2F3] dark:bg-[#121214] text-zinc-600 dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white border-[#E4E4E7] dark:border-[#27272A] hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A]'
+                  isAccountActive
+                    ? 'bg-[#F21B2D] text-white border-[#F21B2D] shadow-sm'
+                    : accountName
+                      ? 'bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-white border-[#F21B2D]/40 hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A]'
+                      : 'bg-[#FFF2F3] dark:bg-[#121214] text-zinc-600 dark:text-zinc-300 hover:text-[#18181B] dark:hover:text-white border-[#E4E4E7] dark:border-[#27272A] hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A]'
                 }`}
                 aria-label={accountName ? `Account (${accountName})` : 'Log in or create account'}
+                aria-current={isAccountActive ? 'page' : undefined}
               >
                 {accountName ? (
                   <>
-                    <UserCheck className="w-4 h-4 text-[#F21B2D] shrink-0" />
+                    <UserCheck
+                      className={`w-4 h-4 shrink-0 ${
+                        isAccountActive ? 'text-white' : 'text-[#F21B2D]'
+                      }`}
+                    />
                     <span className="truncate hidden sm:inline">{accountName}</span>
                     {syncStatus === 'offline' && (
                       <span
-                        className="w-2 h-2 rounded-full bg-amber-500 shrink-0"
+                        className="w-2 h-2 rounded-full bg-amber-400 shrink-0"
                         title="Offline — waiting to sync"
                       />
                     )}
@@ -321,7 +330,7 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="truncate">Scan Menu</span>
             </button>
 
-            {/* 3. Right: Compare Bars */}
+            {/* 3. Right: Bar Hub */}
             <button
               onClick={() => setActiveTab('bars')}
               className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
@@ -331,9 +340,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Store className="w-4 h-4 shrink-0" />
-              <span className="truncate">
-                <span className="hidden sm:inline">Compare </span>Bars ({availableBars.length})
-              </span>
+              <span className="truncate">Bar Hub</span>
             </button>
           </nav>
         </div>

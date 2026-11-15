@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { AlertTriangle, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, Globe, Trash2, X } from 'lucide-react';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -7,7 +7,7 @@ interface ConfirmModalProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  variant?: 'danger' | 'warning';
+  variant?: 'danger' | 'warning' | 'primary';
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -59,12 +59,16 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="flex items-start gap-3.5">
           <div
             className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-              variant === 'danger'
-                ? 'bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30'
-                : 'bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40'
+              variant === 'primary'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                : variant === 'danger'
+                  ? 'bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30'
+                  : 'bg-[#FF8A8E]/20 text-[#D91424] dark:text-[#FF8A8E] border border-[#FF8A8E]/40'
             }`}
           >
-            {variant === 'danger' ? (
+            {variant === 'primary' ? (
+              <Globe className="w-5 h-5" />
+            ) : variant === 'danger' ? (
               <Trash2 className="w-5 h-5" />
             ) : (
               <AlertTriangle className="w-5 h-5" />
@@ -96,7 +100,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             onClick={onConfirm}
             className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 bg-[#F21B2D] hover:bg-[#D91424] text-white"
           >
-            <Trash2 className="w-4 h-4" />
+            {variant === 'danger' ? (
+              <Trash2 className="w-4 h-4" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
             <span>{confirmLabel}</span>
           </button>
         </div>

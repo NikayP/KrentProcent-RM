@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   DrinkItem,
-  CalculatedDrink,
   rankDrinks,
   formatCurrency,
   filterDrinksByBar,
@@ -121,7 +120,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           )}) -> ${d.pureAlcoholPerCurrency} ml/${currency}`
       )
       .join('\n');
-    const text = `🍺 KrentProcent RM Bar Value Ranking (${barLabel}):\n${summary}\n\nWinner: ${bestOverall?.name} (${bestOverall?.pureAlcoholPerCurrency} ml/${currency})`;
+    const text = `🍺 KrentProcent Bar Value Ranking (${barLabel}):\n${summary}\n\nWinner: ${bestOverall?.name} (${bestOverall?.pureAlcoholPerCurrency} ml/${currency})`;
 
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {

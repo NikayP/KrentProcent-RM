@@ -1,4 +1,4 @@
--- KrentProcent RM: migratie 0002 — gebruikersnaam veilig wijzigen via RPC
+-- KrentProcent: migratie 0002 — gebruikersnaam veilig wijzigen via RPC
 -- Voer dit eenmalig uit in de Supabase SQL Editor.
 
 create or replace function public.change_username(new_name text) returns text
