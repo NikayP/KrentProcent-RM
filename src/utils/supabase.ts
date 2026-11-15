@@ -4,6 +4,21 @@ import {
   sanitizeDrinkItem,
   deduplicateDrinksPerBar,
 } from './calculator';
+import {
+  USERNAME_REGEX,
+  normalizeUsername,
+  validateUsername,
+  validatePassword,
+  mapAuthError,
+} from './accountValidation';
+
+export {
+  USERNAME_REGEX,
+  normalizeUsername,
+  validateUsername,
+  validatePassword,
+  mapAuthError,
+};
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
@@ -19,68 +34,6 @@ export const supabase: SupabaseClient | null = isAccountsEnabled
       },
     })
   : null;
-
-export const USERNAME_REGEX = /^[a-z0-9._-]{3,24}$/;
-
-export function normalizeUsername(raw: string): string {
-  return raw.trim().toLowerCase();
-}
-
-export function validateUsername(raw: string): string | null {
-  const normalized = normalizeUsername(raw);
-  if (normalized.length < 3 || normalized.length > 24) {
-    return 'Username must be 3–24 characters.';
-  }
-  if (!USERNAME_REGEX.test(normalized)) {
-    return 'Use only letters, numbers, dots (.), underscores (_), or hyphens (-).';
-  }
-  return null;
-}
-
-export function validatePassword(password: string): string | null {
-  if (password.length < 8) {
-    return 'Password must be at least 8 characters.';
-  }
-  if (password.length > 200) {
-    return 'Password is too long (max 200 characters).';
-  }
-  return null;
-}
-
-export function mapAuthError(message: string): string {
-  const msg = (message || '').trim();
-  if (/already registered|user already exists/i.test(msg)) {
-    return 'This email is already registered.';
-  }
-  if (/invalid login credentials/i.test(msg)) {
-    return 'Wrong username/email or password.';
-  }
-  if (/email not confirmed/i.test(msg)) {
-    return 'Please confirm your email address first.';
-  }
-  if (/rate limit|too many|429/i.test(msg)) {
-    return 'Too many attempts. Please try again later.';
-  }
-  if (/password.*(short|least|characters)/i.test(msg)) {
-    return 'Password must be at least 8 characters.';
-  }
-  if (/duplicate key|profiles_username_key|profiles_pkey/i.test(msg)) {
-    return 'This username is already taken.';
-  }
-  if (/new password should be different/i.test(msg)) {
-    return 'Please choose a different password from your current one.';
-  }
-  if (/expired|invalid.*token|otp_expired/i.test(msg)) {
-    return 'This reset link has expired. Please request a new one.';
-  }
-  if (/unable to validate email|invalid email/i.test(msg)) {
-    return 'Please enter a valid email address.';
-  }
-  if (/failed to fetch|networkerror|network request failed/i.test(msg)) {
-    return 'Network error. Please check your connection and try again.';
-  }
-  return 'Something went wrong. Please try again.';
-}
 
 function requireClient(): SupabaseClient {
   if (!supabase) {
@@ -216,6 +169,63 @@ export async function updatePassword(newPassword: string): Promise<void> {
   if (error) {
     throw new Error(mapAuthError(error.message));
   }
+}
+
+export async function changeUsername(newName: string): Promise<string> {
+  const client = requireClient();
+  const usernameError = validateUsername(newName);
+  if (usernameError) throw new Error(usernameError);
+
+  const normalized = normalizeUsername(newName);
+  const { data, error } = await client.rpc('change_username', {
+    new_name: normalized,
+  });
+
+  if (error) {
+    throw new Error(mapAuthError(error.message));
+  }
+
+  const updatedName = typeof data === 'string' && data ? data : normalized;
+  // Keep auth user_metadata aligned so header/profile never flashes the old name
+  await client.auth.updateUser({ data: { username: updatedName } }).catch(() => {});
+  return updatedName;
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const client = requireClient();
+  if (!currentPassword) {
+    throw new Error('Please enter your current password.');
+  }
+
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) throw new Error(passwordError);
+
+  if (currentPassword === newPassword) {
+    throw new Error('Please choose a different password from your current one.');
+  }
+
+  const { data: sessionData } = await client.auth.getSession();
+  const email = sessionData.session?.user?.email;
+  if (!email) {
+    throw new Error('Could not verify your account. Please log out and log in again.');
+  }
+
+  const { error: verifyError } = await client.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+
+  if (verifyError) {
+    if (/invalid login credentials/i.test(verifyError.message)) {
+      throw new Error('Current password is incorrect.');
+    }
+    throw new Error(mapAuthError(verifyError.message));
+  }
+
+  await updatePassword(newPassword);
 }
 
 export async function logOut(): Promise<void> {

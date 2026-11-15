@@ -986,6 +986,7 @@ export default function App() {
               pendingAuthModeRef.current = null;
             }}
             onRequestDeleteAccount={() => setDeleteAccountPending(true)}
+            onUsernameChanged={(newName) => setUsername(newName)}
             onShowToast={showToast}
             localDrinkCount={drinks.length}
           />
