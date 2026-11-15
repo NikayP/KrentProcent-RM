@@ -5,7 +5,6 @@ import {
   Store,
   AlertTriangle,
   RefreshCw,
-  Copy,
 } from 'lucide-react';
 import { DRINK_CATEGORY_LIST, CategoryIcon } from './CategoryIcon';
 import {
@@ -77,30 +76,6 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
       price: price || 0,
     });
   }, [existingDrinks, name, resolvedBarName, volumeMl, abv, price]);
-
-  // Find drinks from OTHER bars that match or can be quick-copied to this bar
-  const otherBarSuggestions = useMemo(() => {
-    const uniqueBySignature = new Map<string, DrinkItem>();
-    for (const d of existingDrinks) {
-      if (areBarNamesEquivalent(d.barName || DEFAULT_BAR_NAME, resolvedBarName)) continue;
-      // Skip if this exact drink+volume already exists in current bar
-      const alreadyInCurrentBar = findDuplicateDrinkInBar(existingDrinks, {
-        name: d.name,
-        barName: resolvedBarName,
-        volumeMl: d.volumeMl,
-        abv: d.abv,
-        price: d.price,
-      });
-      if (alreadyInCurrentBar && alreadyInCurrentBar.matchType !== 'same_name_diff_volume') {
-        continue;
-      }
-      const sig = `${normalizeDrinkKey(d.name)}::${Math.round(d.volumeMl)}`;
-      if (!uniqueBySignature.has(sig)) {
-        uniqueBySignature.set(sig, d);
-      }
-    }
-    return Array.from(uniqueBySignature.values()).slice(0, 6);
-  }, [existingDrinks, resolvedBarName]);
 
   // Live calculation preview
   const preview = calculateDrinkMetrics({
@@ -297,27 +272,6 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
               ))}
             </datalist>
           </div>
-
-          {/* Quick-copy drinks known from other bars */}
-          {otherBarSuggestions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-1 shrink-0">
-                <Copy className="w-3 h-3 text-[#F21B2D]" />
-                <span>From other bars (adjust price):</span>
-              </span>
-              {otherBarSuggestions.map((item) => (
-                <button
-                  key={`other-${item.id}`}
-                  type="button"
-                  onClick={() => applyPreset(item, true)}
-                  title={`Copy ${item.name} (${item.volumeMl}ml, ${item.abv}%) from ${item.barName} to ${resolvedBarName}`}
-                  className="text-[10px] px-2 py-0.5 rounded-lg bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FF8A8E]/20 text-zinc-700 dark:text-zinc-300 hover:text-[#D91424] dark:hover:text-[#FF8A8E] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#FF8A8E] transition-colors whitespace-nowrap"
-                >
-                  + {item.name} ({item.volumeMl}ml)
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Drink Name, Notes & Category */}
