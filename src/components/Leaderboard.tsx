@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   DrinkItem,
   rankDrinks,
-  formatCurrency,
   filterDrinksByBar,
   normalizeDrinkKey,
   normalizeBarKey,
@@ -13,16 +12,18 @@ import {
   ArrowUpDown,
   Filter,
   Sparkles,
-  Trophy,
   Share2,
   Check,
   Beer,
   Store,
-  Trash2,
   Search,
-  Globe,
 } from 'lucide-react';
 import { CategoryIcon, DRINK_CATEGORY_META } from './CategoryIcon';
+import {
+  preloadShareCardAssets,
+  shareTopThreeImage,
+  type ShareSortOption,
+} from '../utils/shareCard';
 
 interface LeaderboardProps {
   drinks: DrinkItem[];
@@ -32,11 +33,10 @@ interface LeaderboardProps {
   onLoadPresets: () => void;
   activeBar: string;
   onSelectBar: (bar: string) => void;
-  onDeleteBar: (bar: string) => void;
   availableBars: string[];
 }
 
-type SortOption = 'krent' | 'price' | 'abv' | 'alcohol';
+type SortOption = ShareSortOption;
 
 export const Leaderboard: React.FC<LeaderboardProps> = ({
   drinks,
@@ -46,13 +46,16 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   onLoadPresets,
   activeBar,
   onSelectBar,
-  onDeleteBar,
   availableBars,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('krent');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [copied, setCopied] = useState(false);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'generating' | 'shared' | 'copied' | 'downloaded'>('idle');
+
+  useEffect(() => {
+    preloadShareCardAssets();
+  }, []);
 
   // Map of (normalizedDrinkKey::volumeMl) -> Set of normalizedBarKeys across the entire database
   const crossBarPresenceMap = useMemo(() => {
@@ -106,39 +109,30 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   }, [ranked, selectedCategory, searchQuery, sortBy]);
 
   const bestOverall = ranked[0];
-  const worstOverall = ranked[ranked.length - 1];
+  const topThree = useMemo(() => filtered.slice(0, 3), [filtered]);
 
-  const handleShare = async () => {
-    if (ranked.length === 0) return;
-    const barLabel = activeBar === 'all' ? 'All Bars' : activeBar;
-    const summary = ranked
-      .map(
-        (d, i) =>
-          `#${i + 1}: ${d.name} [${d.barName}] (${d.volumeMl}ml, ${d.abv}%, ${formatCurrency(
-            d.price,
-            currency
-          )}) -> ${d.pureAlcoholPerCurrency} ml/${currency}`
-      )
-      .join('\n');
-    const text = `🍺 KrentProcent Bar Value Ranking (${barLabel}):\n${summary}\n\nWinner: ${bestOverall?.name} (${bestOverall?.pureAlcoholPerCurrency} ml/${currency})`;
-
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({
-          title: `KrentProcent Ranking (${barLabel})`,
-          text,
-        });
-        return;
-      } catch (err: any) {
-        // User cancelled the native share sheet — do not fall back to clipboard toast
-        if (err?.name === 'AbortError') return;
+  const handleShareTopThree = async () => {
+    if (topThree.length === 0 || shareStatus === 'generating') return;
+    setShareStatus('generating');
+    try {
+      const outcome = await shareTopThreeImage({
+        drinks: topThree,
+        activeBar,
+        selectedCategory,
+        sortBy,
+        searchQuery,
+        currency,
+      });
+      if (outcome === 'shared' || outcome === 'copied' || outcome === 'downloaded') {
+        setShareStatus(outcome);
+        setTimeout(() => setShareStatus('idle'), 2000);
+      } else {
+        setShareStatus('idle');
       }
+    } catch (err) {
+      console.error('Failed to generate Top 3 share image:', err);
+      setShareStatus('idle');
     }
-
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
   };
 
   if (drinks.length === 0 && availableBars.length === 0) {
@@ -170,13 +164,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     <div className="space-y-4">
       {/* Active Bar Context Banner */}
       <div id="tour-leaderboard-banner" className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-[#FF8A8E]/20 text-[#F21B2D] flex items-center justify-center shrink-0">
             <Store className="w-5 h-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                 Current Menu Focus:
               </span>
               <span className="text-sm font-extrabold tracking-[-0.02em] text-[#D91424] dark:text-[#FF8A8E] bg-[#FF8A8E]/20 px-2 py-0.5 rounded-lg border border-[#FF8A8E]/40">
@@ -191,103 +185,37 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           </div>
         </div>
 
-        {/* Quick switch to all bars or other bars */}
-        <div className="flex items-center gap-2 shrink-0">
-          {activeBar !== 'all' ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onSelectBar('all')}
-                className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] transition-colors inline-flex items-center gap-1.5"
-              >
-                <Globe className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
-                <span>View All Bars</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onDeleteBar(activeBar)}
-                title={`Delete ${activeBar} and all of its drinks`}
-                className="text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-[#FFFFFF] dark:bg-[#121214] hover:bg-[#FF8A8E]/15 text-zinc-500 dark:text-zinc-400 hover:text-[#F21B2D] border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D]/40 transition-colors flex items-center gap-1.5"
-                aria-label={`Delete bar ${activeBar}`}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete Bar</span>
-              </button>
-            </div>
-          ) : (
-            availableBars.length > 0 && (
-              <select
-                value={activeBar}
-                onChange={(e) => onSelectBar(e.target.value)}
-                className="bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-zinc-200 text-xs font-semibold rounded-xl px-2.5 py-1.5 border border-[#E4E4E7] dark:border-[#27272A] focus:outline-none focus:border-[#F21B2D]"
-              >
-                <option value="all">All Bars</option>
-                {availableBars.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-            )
-          )}
-        </div>
-      </div>
-
-      {/* Top Winner Insight Banner for Current Bar */}
-      {bestOverall && ranked.length > 1 && (
-        <div className="bg-gradient-to-r from-[#FF8A8E]/25 via-[#FFFFFF] to-[#FFF2F3] dark:from-[#F21B2D]/15 dark:via-[#18181B] dark:to-[#18181B] border border-[#F21B2D]/40 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-[#F21B2D] flex items-center justify-center text-white shadow-sm shrink-0">
-              <Trophy className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-[11px] font-bold text-[#F21B2D] uppercase tracking-widest">
-                {activeBar === 'all' ? 'Overall #1 Recommendation' : `#1 Deal at ${activeBar}`}
-              </div>
-              <h3 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF]">
-                {bestOverall.name}{' '}
-                <span className="text-[#F21B2D] font-semibold tabular-nums tracking-[-0.01em]">
-                  ({bestOverall.pureAlcoholPerCurrency} ml alcohol per {currency})
-                </span>
-              </h3>
-              <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">
-                {worstOverall && worstOverall.id !== bestOverall.id ? (
-                  <>
-                    Gives you{' '}
-                    <span className="font-bold text-[#F21B2D]">
-                      +{Math.abs(worstOverall.percentageRelativeToBest || 0).toFixed(0)}% more
-                      alcohol per {currency}
-                    </span>{' '}
-                    compared to {worstOverall.name}.
-                  </>
-                ) : (
-                  'Best mathematical value at this bar right now.'
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
+        {/* Subtle Top 3 image share */}
+        {topThree.length > 0 && (
+          <div className="flex items-center shrink-0">
             <button
-              onClick={handleShare}
-              className="px-3.5 py-2 rounded-xl bg-[#FFFFFF] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+              type="button"
+              onClick={handleShareTopThree}
+              disabled={shareStatus === 'generating'}
+              title={`Share current Top ${topThree.length} as image`}
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 disabled:opacity-60"
             >
-              {copied ? (
+              {shareStatus === 'shared' || shareStatus === 'copied' || shareStatus === 'downloaded' ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="text-emerald-600 dark:text-emerald-400">Copied to Clipboard!</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-emerald-600 dark:text-emerald-400">
+                    {shareStatus === 'shared'
+                      ? 'Shared!'
+                      : shareStatus === 'copied'
+                        ? 'Copied PNG!'
+                        : 'Saved PNG!'}
+                  </span>
                 </>
               ) : (
                 <>
-                  <Share2 className="w-3.5 h-3.5 text-[#F21B2D]" />
-                  <span>Share Board</span>
+                  <Share2 className="w-3.5 h-3.5 text-[#F21B2D] shrink-0" />
+                  <span>{topThree.length === 1 ? 'Share #1' : `Share Top ${topThree.length}`}</span>
                 </>
               )}
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Filter, Search & Sort Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-[#FFFFFF] dark:bg-[#18181B] p-3 rounded-2xl border border-[#E4E4E7] dark:border-[#27272A] shadow-sm">

@@ -1045,7 +1045,6 @@ export default function App() {
               onLoadPresets={handleLoadPresets}
               activeBar={activeBar}
               onSelectBar={setActiveBar}
-              onDeleteBar={handleDeleteBar}
               availableBars={availableBars}
             />
           </div>
