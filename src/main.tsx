@@ -1,6 +1,20 @@
 import '@fontsource-variable/inter';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { attemptStaleChunkReload } from './utils/lazyWithRetry';
 import './index.css';
 
-createRoot(document.getElementById('root')!).render(<App />);
+if (typeof window !== 'undefined') {
+  // Recover cleanly if a backgrounded tab attempts to load chunks from an older deployment
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    attemptStaleChunkReload();
+  });
+}
+
+createRoot(document.getElementById('root')!).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);

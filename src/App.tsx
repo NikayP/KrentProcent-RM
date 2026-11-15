@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
 import { flushSync } from 'react-dom';
 import type { Session } from '@supabase/supabase-js';
 import {
@@ -20,18 +20,18 @@ import { UpdatePrompt } from './components/UpdatePrompt';
 import { DrinkForm } from './components/DrinkForm';
 import { Leaderboard } from './components/Leaderboard';
 import { ConfirmModal } from './components/ConfirmModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { MenuScanner } from './components/MenuScanner';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 import type { SyncStatus } from './types/account';
 import type { BarsSubTab } from './components/bars/BarsHub';
 import { usePublicBarsSync } from './hooks/usePublicBarsSync';
 
-const loadMenuScanner = () =>
-  import('./components/MenuScanner').then((m) => ({ default: m.MenuScanner }));
 const loadBarsHub = () =>
   import('./components/bars/BarsHub').then((m) => ({ default: m.BarsHub }));
 
-const MenuScanner = lazy(loadMenuScanner);
-const BarsHub = lazy(loadBarsHub);
-const QuickTourModal = lazy(() =>
+const BarsHub = lazyWithRetry(loadBarsHub);
+const QuickTourModal = lazyWithRetry(() =>
   import('./components/QuickTourModal').then((m) => ({ default: m.QuickTourModal }))
 );
 
@@ -401,7 +401,6 @@ export default function App() {
   // Prefetch lazy tab chunks once the browser is idle so tab switches feel instant
   useEffect(() => {
     const prefetch = () => {
-      void loadMenuScanner();
       void loadBarsHub();
     };
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
@@ -994,6 +993,11 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:px-6 space-y-6">
+        <ErrorBoundary
+          key={activeTab}
+          onBack={activeTab !== 'calculator' ? () => switchTab('calculator') : undefined}
+          backLabel="Back to Drinks"
+        >
         {/* TAB 1: Calculator & Leaderboard */}
         {activeTab === 'calculator' && (
           <div className="space-y-6">
@@ -1052,15 +1056,13 @@ export default function App() {
 
         {/* TAB 2: AI Menu Scanner (Central Feature) */}
         {activeTab === 'scanner' && (
-          <Suspense fallback={<TabSkeleton />}>
-            <MenuScanner
-              onImportDrinks={handleImportDrinks}
-              existingDrinks={drinks}
-              currency={currency}
-              activeBar={activeBar}
-              availableBars={availableBars}
-            />
-          </Suspense>
+          <MenuScanner
+            onImportDrinks={handleImportDrinks}
+            existingDrinks={drinks}
+            currency={currency}
+            activeBar={activeBar}
+            availableBars={availableBars}
+          />
         )}
 
         {/* TAB 3: My Bars, Discover & Account Hub */}
@@ -1089,6 +1091,7 @@ export default function App() {
             />
           </Suspense>
         )}
+        </ErrorBoundary>
       </main>
 
       {/* In-App Confirmation Modal: Delete Bar */}
