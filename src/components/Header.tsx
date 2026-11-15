@@ -17,6 +17,8 @@ import {
   Moon,
   User,
   UserCheck,
+  Download,
+  WifiOff,
 } from 'lucide-react';
 import { DrinkItem, filterDrinksByBar, normalizeBarKey, DEFAULT_BAR_NAME } from '../utils/calculator';
 import { BrandLogo } from './BrandLogo';
@@ -38,6 +40,9 @@ interface HeaderProps {
   accountName?: string | null;
   syncStatus?: 'idle' | 'saving' | 'saved' | 'offline';
   onOpenAccount?: () => void;
+  canInstall?: boolean;
+  onInstallApp?: () => void;
+  isOnline?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -57,6 +62,9 @@ export const Header: React.FC<HeaderProps> = ({
   accountName,
   syncStatus,
   onOpenAccount,
+  canInstall = false,
+  onInstallApp,
+  isOnline = true,
 }) => {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [barSearchQuery, setBarSearchQuery] = useState('');
@@ -190,7 +198,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 backdrop-blur-md border-b border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FFFFFF] shadow-sm transition-colors duration-200">
+    <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top)] bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 backdrop-blur-md border-b border-[#E4E4E7] dark:border-[#27272A] text-[#18181B] dark:text-[#FFFFFF] shadow-sm transition-colors duration-200 select-none">
       <div className="max-w-6xl mx-auto px-4 py-2.5 sm:py-3 sm:px-6 space-y-2.5">
         {/* Top Row: Brand & Theme/Reset Controls */}
         <div className="flex items-center justify-between gap-3">
@@ -198,6 +206,29 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Controls */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {!isOnline && (
+              <span
+                title="Offline mode — local data and text menu parsing work offline"
+                className="px-2 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center gap-1"
+              >
+                <WifiOff className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Offline</span>
+              </span>
+            )}
+
+            {canInstall && onInstallApp && (
+              <button
+                type="button"
+                onClick={onInstallApp}
+                title="Install KrentProcent as an app"
+                className="px-2.5 py-1.5 sm:py-2 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+                aria-label="Install app"
+              >
+                <Download className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Install</span>
+              </button>
+            )}
+
             {onOpenAccount && (
               <button
                 id="tour-account-btn"
@@ -260,8 +291,8 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Navigation Tabs Row */}
-        <div>
+        {/* Navigation Tabs Row (Desktop & Tablet — Mobile uses BottomTabBar) */}
+        <div className="hidden sm:block">
           <nav className="grid grid-cols-3 gap-1.5 bg-[#FFF2F3] dark:bg-[#121214] p-1 rounded-2xl border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold">
             {/* 1. Left: Drinks Calculator */}
             <button

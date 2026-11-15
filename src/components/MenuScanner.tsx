@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ArrowRight,
   Store,
+  WifiOff,
 } from 'lucide-react';
 import {
   DrinkItem,
@@ -22,6 +23,8 @@ import {
   sanitizeDrinkItem,
   isExplicitZeroAlcohol,
 } from '../utils/calculator';
+import { parseMenuFallback } from '../utils/menuParser';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
 
 /**
@@ -122,13 +125,14 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [mode, setMode] = useState<'photo' | 'text'>('photo');
   const [isGeminiConfigured, setIsGeminiConfigured] = useState<boolean>(true);
   const [preScanStatus, setPreScanStatus] = useState<'idle' | 'running' | 'ready'>('idle');
+  const isOnline = useOnlineStatus();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inFlightPreScanRef = useRef<{ key: string; promise: Promise<any> } | null>(null);
 
   // Speculative background pre-scan: starts analyzing the menu image the instant it is selected
   const startBackgroundPreScan = (imgDataUrl: string) => {
-    if (!isGeminiConfigured) return;
+    if (!isGeminiConfigured || !isOnline) return;
     const cacheKey = computeScanCacheKey(imgDataUrl, '');
     if (scanResultCache.has(cacheKey)) {
       setPreScanStatus('ready');
@@ -272,7 +276,25 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         }
       }
 
+      if (!data && !imagePreview && textToSend.trim()) {
+        // Parse menu text locally in-browser so text scanning is instant and works offline
+        const localParsed = parseMenuFallback(textToSend, barToUse);
+        if (localParsed.drinks.length > 0) {
+          data = localParsed;
+        } else if (!isOnline) {
+          throw new Error(
+            'Could not detect priced drinks in the pasted text. Try lines like "Heineken 25cl 5% €3.60".'
+          );
+        }
+      }
+
       if (!data) {
+        if (!isOnline) {
+          throw new Error(
+            'You are currently offline. AI photo scanning requires an internet connection — switch to "Paste Menu Text" to parse menus offline.'
+          );
+        }
+
         const response = await fetch('/api/scan-menu', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -610,7 +632,29 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       {/* Input Areas */}
       {mode === 'photo' ? (
         <div className="space-y-4">
-          {!isGeminiConfigured && (
+          {!isOnline && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/35 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
+              <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-bold text-[#18181B] dark:text-[#FFFFFF]">
+                  You&apos;re Offline — Photo Scanning Unavailable
+                </p>
+                <p className="text-zinc-600 dark:text-zinc-300">
+                  AI photo recognition needs an internet connection. You can still use{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode('text')}
+                    className="font-bold underline text-[#F21B2D]"
+                  >
+                    Paste Menu Text
+                  </button>{' '}
+                  offline!
+                </p>
+              </div>
+            </div>
+          )}
+
+          {isOnline && !isGeminiConfigured && (
             <div className="p-3.5 rounded-xl bg-[#FF8A8E]/15 border border-[#FF8A8E]/40 text-[#D91424] dark:text-[#FF8A8E] text-xs flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 text-[#F21B2D] mt-0.5" />
               <div className="space-y-1">
@@ -691,7 +735,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             <button
               type="button"
               onClick={() => handleScan()}
-              disabled={isScanning || isProcessingImage}
+              disabled={isScanning || isProcessingImage || !isOnline}
               className="w-full py-3 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-extrabold tracking-[-0.01em] text-sm flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50"
             >
               {isScanning ? (

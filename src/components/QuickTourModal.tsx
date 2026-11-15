@@ -201,8 +201,8 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
         />
       )}
 
-      {/* Floating Tour Card - compact on mobile */}
-      <div className="fixed bottom-2.5 sm:bottom-5 left-1/2 -translate-x-1/2 w-full max-w-lg px-3 sm:px-4 z-50">
+      {/* Floating Tour Card - positioned above BottomTabBar on mobile */}
+      <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 w-full max-w-lg px-3 sm:px-4 z-50">
         <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#F21B2D]/40 rounded-2xl p-3 sm:p-5 shadow-2xl relative text-[#18181B] dark:text-[#FFFFFF] space-y-2 sm:space-y-3">
           {/* Close Button */}
           <button

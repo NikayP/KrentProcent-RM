@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import type { Session } from '@supabase/supabase-js';
 import {
   DrinkItem,
@@ -14,6 +15,8 @@ import {
 } from './utils/calculator';
 import { POPULAR_BAR_PRESETS } from './presets/barData';
 import { Header } from './components/Header';
+import { BottomTabBar } from './components/BottomTabBar';
+import { UpdatePrompt } from './components/UpdatePrompt';
 import { DrinkForm } from './components/DrinkForm';
 import { Leaderboard } from './components/Leaderboard';
 import { MenuScanner } from './components/MenuScanner';
@@ -21,6 +24,9 @@ import { CrossBarComparison } from './components/CrossBarComparison';
 import { ConfirmModal } from './components/ConfirmModal';
 import { QuickTourModal } from './components/QuickTourModal';
 import { AccountModal, type SyncStatus } from './components/AccountModal';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { useInstallPrompt } from './hooks/useInstallPrompt';
+import { triggerHaptic } from './utils/haptics';
 import {
   supabase,
   isAccountsEnabled,
@@ -119,8 +125,57 @@ export default function App() {
     return availableBars[0] || 'Café De Dokter';
   });
 
-  const [activeTab, setActiveTab] = useState<'calculator' | 'scanner' | 'bars'>(
-    'calculator'
+  const [activeTab, setActiveTab] = useState<'calculator' | 'scanner' | 'bars'>(() => {
+    if (typeof window === 'undefined') return 'calculator';
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    if (tabParam === 'scanner' || tabParam === 'bars' || tabParam === 'calculator') {
+      return tabParam;
+    }
+    return 'calculator';
+  });
+
+  const isOnline = useOnlineStatus();
+  const { canInstall, promptInstall } = useInstallPrompt();
+
+  const scrollPositionsRef = useRef<Record<'calculator' | 'scanner' | 'bars', number>>({
+    calculator: 0,
+    scanner: 0,
+    bars: 0,
+  });
+
+  const switchTab = useCallback(
+    (nextTab: 'calculator' | 'scanner' | 'bars') => {
+      if (nextTab === activeTab) return;
+      scrollPositionsRef.current[activeTab] = window.scrollY;
+
+      const applyTab = () => {
+        setActiveTab(nextTab);
+      };
+
+      const docWithTransition = document as Document & {
+        startViewTransition?: (cb: () => void) => void;
+      };
+
+      if (typeof docWithTransition.startViewTransition === 'function') {
+        try {
+          docWithTransition.startViewTransition(() => {
+            flushSync(applyTab);
+          });
+        } catch {
+          applyTab();
+        }
+      } else {
+        applyTab();
+      }
+
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: scrollPositionsRef.current[nextTab] ?? 0,
+          behavior: 'instant' as ScrollBehavior,
+        });
+      });
+    },
+    [activeTab]
   );
 
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -137,6 +192,10 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute('content', theme === 'dark' ? '#18181B' : '#FFFFFF');
+    }
     try {
       localStorage.setItem(THEME_STORAGE_KEY, theme);
     } catch {
@@ -201,6 +260,64 @@ export default function App() {
       // ignore storage errors
     }
   };
+
+  // Android / browser back gesture closes the topmost open modal before leaving the app
+  const anyModalOpen =
+    Boolean(barPendingDelete) ||
+    resetPending ||
+    deleteAccountPending ||
+    isAccountOpen ||
+    isTourOpen;
+  const pushedModalHistoryRef = useRef(false);
+  const closingFromPopstateRef = useRef(false);
+
+  useEffect(() => {
+    if (anyModalOpen && !pushedModalHistoryRef.current) {
+      pushedModalHistoryRef.current = true;
+      window.history.pushState(
+        { ...(window.history.state || {}), kpModal: true },
+        '',
+        window.location.href
+      );
+    } else if (!anyModalOpen && pushedModalHistoryRef.current) {
+      pushedModalHistoryRef.current = false;
+      if (!closingFromPopstateRef.current && window.history.state?.kpModal) {
+        window.history.back();
+      }
+      closingFromPopstateRef.current = false;
+    }
+  }, [anyModalOpen]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!pushedModalHistoryRef.current) return;
+      closingFromPopstateRef.current = true;
+      pushedModalHistoryRef.current = false;
+
+      if (deleteAccountPending) setDeleteAccountPending(false);
+      else if (resetPending) setResetPending(false);
+      else if (barPendingDelete) setBarPendingDelete(null);
+      else if (isAccountOpen) {
+        setIsAccountOpen(false);
+        if (isRecovery) setIsRecovery(false);
+      } else if (isTourOpen) {
+        handleCloseTour();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [deleteAccountPending, resetPending, barPendingDelete, isAccountOpen, isRecovery, isTourOpen]);
+
+  // Ask browser for persistent storage once so local drinks aren't evicted under storage pressure
+  const requestedPersistRef = useRef(false);
+  useEffect(() => {
+    if (requestedPersistRef.current) return;
+    requestedPersistRef.current = true;
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      void navigator.storage.persist().catch(() => {});
+    }
+  }, []);
 
   // Expose resetTour helper to window for effortless testing from DevTools console
   useEffect(() => {
@@ -488,6 +605,7 @@ export default function App() {
 
     setDrinks(result.drinks);
     setManagedBars((prev) => getUniqueBars([], [...prev, canonicalBar]));
+    triggerHaptic(10);
 
     if (activeBar !== 'all' && !areBarNamesEquivalent(activeBar, canonicalBar)) {
       setActiveBar(canonicalBar);
@@ -518,6 +636,7 @@ export default function App() {
   };
 
   const handleDeleteDrink = (id: string) => {
+    triggerHaptic(8);
     setDrinks((prev) => prev.filter((d) => d.id !== id));
   };
 
@@ -539,8 +658,9 @@ export default function App() {
     if (merged.updatedCount > 0) parts.push(`${merged.updatedCount} updated`);
     if (merged.skippedCount > 0) parts.push(`${merged.skippedCount} duplicate(s) skipped`);
 
+    triggerHaptic(12);
     showToast(`Menu imported (${parts.join(', ') || 'no changes'})!`);
-    setActiveTab('calculator');
+    switchTab('calculator');
   };
 
   const handleLoadPresets = () => {
@@ -632,7 +752,7 @@ export default function App() {
 
   const handleSelectBarFromComparison = (barName: string) => {
     setActiveBar(barName);
-    setActiveTab('calculator');
+    switchTab('calculator');
   };
 
   const confirmDeleteAccount = async () => {
@@ -661,12 +781,19 @@ export default function App() {
       'Account'
     : null;
 
+  const handleInstallApp = async () => {
+    const outcome = await promptInstall();
+    if (outcome === 'accepted') {
+      showToast('KrentProcent installed on your device!');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] flex flex-col font-sans selection:bg-[#F21B2D] selection:text-white transition-colors duration-200">
+    <div className="min-h-dvh bg-[#FFF2F3] dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] flex flex-col font-sans selection:bg-[#F21B2D] selection:text-white transition-colors duration-200">
       {/* Sticky Top Header with Venue Switcher */}
       <Header
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={switchTab}
         drinkCount={drinks.length}
         drinks={drinks}
         onReset={handleResetAll}
@@ -681,13 +808,16 @@ export default function App() {
         accountName={accountDisplayName}
         syncStatus={syncStatus}
         onOpenAccount={isAccountsEnabled ? () => setIsAccountOpen(true) : undefined}
+        canInstall={canInstall}
+        onInstallApp={handleInstallApp}
+        isOnline={isOnline}
       />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-16 right-4 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#F21B2D]/40 text-[#18181B] dark:text-[#FFFFFF] text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
-            <Check className="w-4 h-4 text-[#F21B2D]" />
+        <div className="fixed top-[calc(env(safe-area-inset-top)+4rem)] right-4 left-4 sm:left-auto z-50 animate-in fade-in slide-in-from-top-2 duration-200 pointer-events-none">
+          <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#F21B2D]/40 text-[#18181B] dark:text-[#FFFFFF] text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 max-w-md ml-auto">
+            <Check className="w-4 h-4 text-[#F21B2D] shrink-0" />
             <span>{toastMessage}</span>
           </div>
         </div>
@@ -824,11 +954,11 @@ export default function App() {
       <QuickTourModal
         isOpen={isTourOpen}
         onClose={handleCloseTour}
-        onNavigateTab={setActiveTab}
+        onNavigateTab={switchTab}
       />
 
       {/* Footer & Fallback / Preset Restore Bar */}
-      <footer className="mt-auto border-t border-[#E4E4E7] dark:border-[#27272A] bg-[#FFFFFF]/80 dark:bg-[#18181B]/90 py-6 text-xs text-zinc-500 dark:text-zinc-400">
+      <footer className="mt-auto border-t border-[#E4E4E7] dark:border-[#27272A] bg-[#FFFFFF]/80 dark:bg-[#18181B]/90 pt-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:py-6 text-xs text-zinc-500 dark:text-zinc-400">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-zinc-600 dark:text-zinc-400">
             <div className="flex items-center gap-2">
@@ -855,6 +985,17 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Mobile Bottom Tab Bar */}
+      <BottomTabBar
+        activeTab={activeTab}
+        onSelectTab={switchTab}
+        drinkCount={drinks.length}
+        barCount={availableBars.length}
+      />
+
+      {/* PWA Update Toast */}
+      <UpdatePrompt />
     </div>
   );
 }

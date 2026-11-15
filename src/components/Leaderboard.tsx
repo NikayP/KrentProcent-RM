@@ -109,7 +109,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const bestOverall = ranked[0];
   const worstOverall = ranked[ranked.length - 1];
 
-  const handleShare = () => {
+  const handleShare = async () => {
     if (ranked.length === 0) return;
     const barLabel = activeBar === 'all' ? 'All Bars' : activeBar;
     const summary = ranked
@@ -122,6 +122,19 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       )
       .join('\n');
     const text = `🍺 KrentProcent RM Bar Value Ranking (${barLabel}):\n${summary}\n\nWinner: ${bestOverall?.name} (${bestOverall?.pureAlcoholPerCurrency} ml/${currency})`;
+
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: `KrentProcent Ranking (${barLabel})`,
+          text,
+        });
+        return;
+      } catch (err: any) {
+        // User cancelled the native share sheet — do not fall back to clipboard toast
+        if (err?.name === 'AbortError') return;
+      }
+    }
 
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
