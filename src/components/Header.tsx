@@ -200,6 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {onOpenAccount && (
               <button
+                id="tour-account-btn"
                 type="button"
                 onClick={onOpenAccount}
                 title={accountName ? `Account: ${accountName}` : 'Log in or create account'}

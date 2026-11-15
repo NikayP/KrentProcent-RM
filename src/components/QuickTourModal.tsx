@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Check,
   Coins,
+  UserCheck,
 } from 'lucide-react';
 
 interface QuickTourProps {
@@ -34,13 +35,13 @@ const TOUR_STEPS: TourStep[] = [
     icon: Coins,
     description:
       'Drinks have gotten expensive. KrentProcent calculates the pure alcohol efficiency for every option on the menu, so you get the most fun and value for your money.',
-    actionTip: 'Take this short 3-step tour to see how to find the top deals in seconds.',
+    actionTip: 'Take this short 4-step tour to see how to find the top deals in seconds.',
     tabTarget: 'calculator',
   },
   {
     targetId: 'tour-drink-presets',
     title: '1. Add drinks manually.',
-    badge: 'Step 1 of 3',
+    badge: 'Step 1 of 4',
     icon: Beer,
     description:
       'Add drinks in seconds using quick templates like a pint, vaasje, or tripel. Just adjust the price to see its instant score.',
@@ -50,7 +51,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     targetId: 'tour-krent-champion',
     title: '2. Spot the Krent Champion.',
-    badge: 'Step 2 of 3',
+    badge: 'Step 2 of 4',
     icon: Trophy,
     description:
       'The leaderboard crowns the #1 Krent Champion, showing you the absolute best deal at this bar and how much you save compared to other choices.',
@@ -60,12 +61,22 @@ const TOUR_STEPS: TourStep[] = [
   {
     targetId: 'tour-scanner-sample',
     title: '3. Scan a menu with AI.',
-    badge: 'Step 3 of 3',
+    badge: 'Step 3 of 4',
     icon: Sparkles,
     description:
       'If you do not want to type everything manually, snap a photo of the pub menu or chalkboard. The AI extracts the drinks and prices for you.',
     actionTip: 'Click "Try Sample" on the scanner tab to see how the extraction works.',
     tabTarget: 'scanner',
+  },
+  {
+    targetId: 'tour-account-btn',
+    title: '4. Save your scans to an account.',
+    badge: 'Step 4 of 4',
+    icon: UserCheck,
+    description:
+      'Optionally create a free account to save and sync your bars and scanned menus across devices. You can always keep using the app without an account.',
+    actionTip: 'Coming soon: browse, adopt, and update community-scanned bars by city.',
+    tabTarget: 'calculator',
   },
 ];
 
