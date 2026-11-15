@@ -4,13 +4,11 @@ import { Beer, Camera, Store } from 'lucide-react';
 interface BottomTabBarProps {
   activeTab: 'calculator' | 'scanner' | 'bars';
   onSelectTab: (tab: 'calculator' | 'scanner' | 'bars') => void;
-  drinkCount: number;
 }
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
   onSelectTab,
-  drinkCount,
 }) => {
   return (
     <nav
@@ -28,24 +26,13 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
         >
           <span
-            className={`relative flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
+            className={`flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
               activeTab === 'calculator'
                 ? 'bg-[#F21B2D] text-white shadow-sm'
                 : 'text-zinc-500 dark:text-zinc-400 group-hover:text-[#18181B] dark:group-hover:text-white'
             }`}
           >
             <Beer className="w-4 h-4" />
-            {drinkCount > 0 && (
-              <span
-                className={`absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-extrabold tabular-nums flex items-center justify-center border ${
-                  activeTab === 'calculator'
-                    ? 'bg-[#FFFFFF] text-[#F21B2D] border-[#F21B2D]'
-                    : 'bg-[#FFF2F3] dark:bg-[#27272A] text-zinc-700 dark:text-zinc-200 border-[#E4E4E7] dark:border-[#3F3F46]'
-                }`}
-              >
-                {drinkCount > 99 ? '99+' : drinkCount}
-              </span>
-            )}
           </span>
           <span
             className={`text-[11px] leading-tight transition-colors ${

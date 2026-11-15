@@ -1192,7 +1192,6 @@ export default function App() {
       <BottomTabBar
         activeTab={activeTab}
         onSelectTab={switchTab}
-        drinkCount={drinks.length}
       />
 
       {/* PWA Update Toast */}
