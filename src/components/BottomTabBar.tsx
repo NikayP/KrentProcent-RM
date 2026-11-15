@@ -1,6 +1,5 @@
 import React from 'react';
 import { Beer, Camera, Store } from 'lucide-react';
-import { triggerHaptic } from '../utils/haptics';
 
 interface BottomTabBarProps {
   activeTab: 'calculator' | 'scanner' | 'bars';
@@ -15,13 +14,6 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   drinkCount,
   barCount,
 }) => {
-  const handleSelect = (tab: 'calculator' | 'scanner' | 'bars') => {
-    if (tab !== activeTab) {
-      triggerHaptic(8);
-    }
-    onSelectTab(tab);
-  };
-
   return (
     <nav
       aria-label="Primary navigation"
@@ -34,7 +26,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           type="button"
           role="tab"
           aria-selected={activeTab === 'calculator'}
-          onClick={() => handleSelect('calculator')}
+          onClick={() => onSelectTab('calculator')}
           className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
         >
           <span
@@ -73,7 +65,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           type="button"
           role="tab"
           aria-selected={activeTab === 'scanner'}
-          onClick={() => handleSelect('scanner')}
+          onClick={() => onSelectTab('scanner')}
           className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
         >
           <span
@@ -101,7 +93,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           type="button"
           role="tab"
           aria-selected={activeTab === 'bars'}
-          onClick={() => handleSelect('bars')}
+          onClick={() => onSelectTab('bars')}
           className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
         >
           <span
