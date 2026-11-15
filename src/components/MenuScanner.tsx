@@ -26,6 +26,13 @@ import {
 import { parseMenuFallback } from '../utils/menuParser';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { SAMPLE_MENU_TEXT, SAMPLE_OPERA_MENU_TEXT } from '../presets/barData';
+import {
+  MAX_PAYLOAD_BYTES,
+  classifyUpload,
+  estimateBase64Bytes,
+  formatFileSize,
+  type UploadKind,
+} from '../utils/uploadFile';
 
 /**
  * Resizes and compresses an image client-side to keep the base64 payload
@@ -96,6 +103,23 @@ function compressImageFile(file: File, maxDimension = 1280, quality = 0.8): Prom
   });
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
+}
+
+interface ScanUpload {
+  dataUrl: string;
+  mimeType: string;
+  kind: UploadKind;
+  fileName: string;
+  sizeBytes: number;
+}
+
 interface MenuScannerProps {
   onImportDrinks: (drinks: DrinkItem[]) => void;
   existingDrinks?: DrinkItem[];
@@ -114,7 +138,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [targetBar, setTargetBar] = useState<string>(
     activeBar && activeBar !== 'all' ? activeBar : 'De Bruine Kroeg'
   );
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [upload, setUpload] = useState<ScanUpload | null>(null);
   const [textInput, setTextInput] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [isProcessingImage, setIsProcessingImage] = useState<boolean>(false);
@@ -127,13 +151,15 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [preScanStatus, setPreScanStatus] = useState<'idle' | 'running' | 'ready'>('idle');
   const isOnline = useOnlineStatus();
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const inFlightPreScanRef = useRef<{ key: string; promise: Promise<any> } | null>(null);
 
-  // Speculative background pre-scan: starts analyzing the menu image the instant it is selected
-  const startBackgroundPreScan = (imgDataUrl: string) => {
+  // Speculative background pre-scan: starts analyzing the menu file the instant it is selected
+  const startBackgroundPreScan = (targetUpload: ScanUpload) => {
     if (!isGeminiConfigured || !isOnline) return;
-    const cacheKey = computeScanCacheKey(imgDataUrl, '');
+    if (estimateBase64Bytes(targetUpload.dataUrl) > MAX_PAYLOAD_BYTES) return;
+    const cacheKey = computeScanCacheKey(targetUpload.dataUrl, '');
     if (scanResultCache.has(cacheKey)) {
       setPreScanStatus('ready');
       return;
@@ -149,8 +175,8 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageBase64: imgDataUrl,
-            mimeType: 'image/jpeg',
+            imageBase64: targetUpload.dataUrl,
+            mimeType: targetUpload.mimeType,
           }),
         });
         if (!response.ok) {
@@ -195,12 +221,21 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     }
   }, [activeBar]);
 
+  const clearSelectedFile = () => {
+    setUpload(null);
+    setPreScanStatus('idle');
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (uploadInputRef.current) uploadInputRef.current.value = '';
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setErrorMessage('Please select a valid image file (PNG, JPG, WebP).');
+    const classified = classifyUpload(file);
+    if (classified.error || !classified.kind) {
+      setErrorMessage(classified.error || 'Please choose a photo or PDF menu.');
+      e.target.value = '';
       return;
     }
 
@@ -210,18 +245,44 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     setIsProcessingImage(true);
 
     try {
-      const compressedDataUrl = await compressImageFile(file, 1280, 0.8);
-      setImagePreview(compressedDataUrl);
-      startBackgroundPreScan(compressedDataUrl);
-    } catch (err: any) {
-      console.warn('Image compression fallback to raw data URL:', err);
-      const reader = new FileReader();
-      reader.onload = () => {
-        const rawUrl = reader.result as string;
-        setImagePreview(rawUrl);
-        startBackgroundPreScan(rawUrl);
-      };
-      reader.readAsDataURL(file);
+      let nextUpload: ScanUpload;
+      if (classified.kind === 'pdf') {
+        const dataUrl = await readFileAsDataUrl(file);
+        nextUpload = {
+          dataUrl,
+          mimeType: 'application/pdf',
+          kind: 'pdf',
+          fileName: file.name,
+          sizeBytes: file.size,
+        };
+      } else {
+        try {
+          const compressedDataUrl = await compressImageFile(file, 1280, 0.8);
+          nextUpload = {
+            dataUrl: compressedDataUrl,
+            mimeType: 'image/jpeg',
+            kind: 'image',
+            fileName: file.name,
+            sizeBytes: file.size,
+          };
+        } catch (err: any) {
+          console.warn('Image compression fallback to raw data URL:', err);
+          const rawUrl = await readFileAsDataUrl(file);
+          nextUpload = {
+            dataUrl: rawUrl,
+            mimeType: classified.mimeType,
+            kind: 'image',
+            fileName: file.name,
+            sizeBytes: file.size,
+          };
+        }
+      }
+
+      setUpload(nextUpload);
+      startBackgroundPreScan(nextUpload);
+    } catch {
+      setErrorMessage('Could not read the selected file. Please try again.');
+      e.target.value = '';
     } finally {
       setIsProcessingImage(false);
     }
@@ -231,20 +292,19 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     const textToSend = overrideText !== undefined ? overrideText : textInput;
     const barToUse = overrideBarName !== undefined ? overrideBarName : targetBar;
 
-    if (!imagePreview && !textToSend.trim()) {
-      setErrorMessage('Please upload a menu image or enter text to scan.');
+    if (!upload && !textToSend.trim()) {
+      setErrorMessage('Please upload a menu photo or PDF, or enter text to scan.');
       return;
     }
 
     // Safety check: ensure payload stays well below Vercel's 4.5 MB platform limit
-    if (imagePreview) {
-      const approxBytes = (imagePreview.length * 3) / 4;
-      if (approxBytes > 4.2 * 1024 * 1024) {
-        setErrorMessage(
-          'The image is too large for the scanning service (> 4.2 MB). Please take a closer photo or crop the image.'
-        );
-        return;
-      }
+    if (upload && estimateBase64Bytes(upload.dataUrl) > MAX_PAYLOAD_BYTES) {
+      setErrorMessage(
+        upload.kind === 'pdf'
+          ? 'PDF is larger than 3 MB — screenshot the drinks page or use a smaller PDF.'
+          : 'The image is too large for the scanning service (> 4.2 MB). Please take a closer photo or crop the image.'
+      );
+      return;
     }
 
     setIsScanning(true);
@@ -253,11 +313,11 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     const clientStartTime = performance.now();
 
     try {
-      const cacheKey = computeScanCacheKey(imagePreview, textToSend);
-      const imgOnlyKey = computeScanCacheKey(imagePreview, '');
+      const cacheKey = computeScanCacheKey(upload?.dataUrl, textToSend);
+      const fileOnlyKey = computeScanCacheKey(upload?.dataUrl, '');
       const cached =
         scanResultCache.get(cacheKey) ||
-        (!textToSend.trim() && imagePreview ? scanResultCache.get(imgOnlyKey) : undefined);
+        (!textToSend.trim() && upload ? scanResultCache.get(fileOnlyKey) : undefined);
       let data: any = null;
       let joinedPreScan = false;
 
@@ -265,10 +325,10 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         data = cached;
       } else if (
         !textToSend.trim() &&
-        imagePreview &&
-        inFlightPreScanRef.current?.key === imgOnlyKey
+        upload &&
+        inFlightPreScanRef.current?.key === fileOnlyKey
       ) {
-        // Join the speculative background pre-scan that started when the image was selected!
+        // Join the speculative background pre-scan that started when the file was selected!
         const preScannedData = await inFlightPreScanRef.current.promise;
         if (preScannedData && Array.isArray(preScannedData.drinks) && preScannedData.drinks.length > 0) {
           data = preScannedData;
@@ -276,7 +336,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         }
       }
 
-      if (!data && !imagePreview && textToSend.trim()) {
+      if (!data && !upload && textToSend.trim()) {
         // Parse menu text locally in-browser so text scanning is instant and works offline
         const localParsed = parseMenuFallback(textToSend, barToUse);
         if (localParsed.drinks.length > 0) {
@@ -291,7 +351,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       if (!data) {
         if (!isOnline) {
           throw new Error(
-            'You are currently offline. AI photo scanning requires an internet connection — switch to "Paste Menu Text" to parse menus offline.'
+            'You are currently offline. AI menu scanning requires an internet connection — switch to "Paste Menu Text" to parse menus offline.'
           );
         }
 
@@ -299,8 +359,8 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            imageBase64: imagePreview || undefined,
-            mimeType: 'image/jpeg',
+            imageBase64: upload?.dataUrl || undefined,
+            mimeType: upload?.mimeType || 'image/jpeg',
             textInput: textToSend || undefined,
             barName: barToUse.trim() || undefined,
           }),
@@ -491,7 +551,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
     onImportDrinks(toImport);
     setSuccessNote(`Imported ${toImport.length} drinks for ${canonicalTarget}!`);
     setScannedDrinks([]);
-    setImagePreview(null);
+    clearSelectedFile();
     setTextInput('');
   };
 
@@ -504,11 +564,11 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             <span className="p-1.5 rounded-xl bg-[#FF8A8E]/20 text-[#F21B2D]">
               <Camera className="w-5 h-5" />
             </span>
-            <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF]">Menu Photo &amp; Screenshot Scanner</h2>
+            <h2 className="text-lg font-extrabold tracking-[-0.03em] text-[#18181B] dark:text-[#FFFFFF]">Menu Photo &amp; PDF Scanner</h2>
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Snap a photo of the pub chalkboard, tap list, or drinks card. Our AI extracts volume,
-            ABV, and price and checks for existing duplicates at this bar!
+            Snap a photo of the pub chalkboard, upload a screenshot, or pick a PDF drinks menu. Our
+            AI extracts volume, ABV, and price and checks for duplicates at this bar!
           </p>
         </div>
 
@@ -612,7 +672,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
           }`}
         >
           <Camera className="w-4 h-4" />
-          <span>Photo / Screenshot</span>
+          <span>Photo / PDF</span>
         </button>
 
         <button
@@ -667,44 +727,86 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
           )}
 
           <input
-            ref={fileInputRef}
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             onChange={handleFileChange}
             className="hidden"
           />
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="image/*,application/pdf,.pdf"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-          {!imagePreview ? (
-            <div
-              onClick={() => !isProcessingImage && fileInputRef.current?.click()}
-              className={`border-2 border-dashed border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] rounded-2xl p-8 text-center cursor-pointer transition-colors bg-[#FFF2F3]/50 dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#18181B] group ${
-                isProcessingImage ? 'opacity-60 cursor-wait' : ''
-              }`}
-            >
-              <div className="w-14 h-14 rounded-2xl bg-[#FFFFFF] dark:bg-[#18181B] group-hover:bg-[#FF8A8E]/20 text-zinc-400 group-hover:text-[#F21B2D] flex items-center justify-center mx-auto mb-3 transition-colors border border-[#E4E4E7] dark:border-[#27272A]">
-                {isProcessingImage ? (
-                  <RefreshCw className="w-6 h-6 animate-spin text-[#F21B2D]" />
-                ) : (
-                  <Upload className="w-6 h-6" />
-                )}
+          {!upload ? (
+            <div className="space-y-3">
+              <button
+                type="button"
+                disabled={isProcessingImage}
+                onClick={() => cameraInputRef.current?.click()}
+                className={`w-full border-2 border-dashed border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] rounded-2xl p-8 text-center cursor-pointer transition-colors bg-[#FFF2F3]/50 dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#18181B] group ${
+                  isProcessingImage ? 'opacity-60 cursor-wait' : ''
+                }`}
+              >
+                <div className="w-14 h-14 rounded-2xl bg-[#FFFFFF] dark:bg-[#18181B] group-hover:bg-[#FF8A8E]/20 text-zinc-400 group-hover:text-[#F21B2D] flex items-center justify-center mx-auto mb-3 transition-colors border border-[#E4E4E7] dark:border-[#27272A]">
+                  {isProcessingImage ? (
+                    <RefreshCw className="w-6 h-6 animate-spin text-[#F21B2D]" />
+                  ) : (
+                    <Camera className="w-6 h-6" />
+                  )}
+                </div>
+                <h4 className="text-sm font-bold text-[#18181B] dark:text-[#FFFFFF] mb-1">
+                  {isProcessingImage ? 'Preparing File...' : 'Take Photo'}
+                </h4>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
+                  {isProcessingImage
+                    ? 'Preparing menu for fast and sharp AI scanning...'
+                    : 'Snap the menu or chalkboard with your camera.'}
+                </p>
+              </button>
+
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={isProcessingImage}
+                  onClick={() => uploadInputRef.current?.click()}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#FFFFFF] dark:bg-[#18181B] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D]/60 text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                >
+                  <Upload className="w-4 h-4 text-[#F21B2D]" />
+                  <span>Upload Photo or PDF</span>
+                </button>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 text-center">
+                  JPG, PNG, WebP, HEIC or PDF (max 3 MB).
+                </p>
               </div>
-              <h4 className="text-sm font-bold text-[#18181B] dark:text-[#FFFFFF] mb-1">
-                {isProcessingImage ? 'Optimizing Photo...' : 'Take Photo or Upload Menu Screenshot'}
-              </h4>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto">
-                {isProcessingImage
-                  ? 'Resizing image for fast and sharp AI scanning...'
-                  : 'Supports camera capture on mobile or JPG, PNG, WebP screenshots from bar apps.'}
-              </p>
             </div>
           ) : (
-            <div className="relative rounded-2xl overflow-hidden border border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/40 dark:bg-[#121214] max-h-80 flex items-center justify-center">
-              <img
-                src={imagePreview}
-                alt="Menu preview"
-                className="max-h-80 w-auto object-contain"
-              />
+            <div className="relative rounded-2xl overflow-hidden border border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/40 dark:bg-[#121214] min-h-[140px] max-h-80 flex items-center justify-center">
+              {upload.kind === 'pdf' ? (
+                <div className="flex items-center gap-3.5 px-5 py-8 pr-28 max-w-full">
+                  <div className="w-12 h-12 rounded-2xl bg-[#F21B2D]/10 text-[#F21B2D] border border-[#F21B2D]/25 flex items-center justify-center shrink-0">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-[#18181B] dark:text-[#FFFFFF] truncate max-w-[220px] sm:max-w-xs">
+                      {upload.fileName}
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 tabular-nums">
+                      PDF menu &bull; {formatFileSize(upload.sizeBytes)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <img
+                  src={upload.dataUrl}
+                  alt="Menu preview"
+                  className="max-h-80 w-auto object-contain"
+                />
+              )}
               {preScanStatus === 'running' && (
                 <div className="absolute top-3 left-3 px-2.5 py-1 rounded-xl bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 text-[#D91424] dark:text-[#FF8A8E] text-[11px] font-semibold border border-[#FF8A8E]/40 flex items-center gap-1.5 shadow-sm">
                   <RefreshCw className="w-3 h-3 animate-spin text-[#F21B2D]" />
@@ -719,19 +821,15 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
               )}
               <button
                 type="button"
-                onClick={() => {
-                  setImagePreview(null);
-                  setPreScanStatus('idle');
-                  if (fileInputRef.current) fileInputRef.current.value = '';
-                }}
+                onClick={clearSelectedFile}
                 className="absolute top-3 right-3 px-3 py-1.5 rounded-xl bg-[#FFFFFF]/95 dark:bg-[#18181B]/95 text-[#18181B] dark:text-zinc-200 text-xs font-semibold border border-[#E4E4E7] dark:border-[#27272A] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] shadow-sm"
               >
-                Change Photo
+                Change File
               </button>
             </div>
           )}
 
-          {imagePreview && (
+          {upload && (
             <button
               type="button"
               onClick={() => handleScan()}
@@ -741,7 +839,11 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
               {isScanning ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Analyzing Drink Menu with Gemini AI...</span>
+                  <span>
+                    {upload.kind === 'pdf'
+                      ? 'Analyzing PDF Menu with Gemini AI...'
+                      : 'Analyzing Drink Menu with Gemini AI...'}
+                  </span>
                 </>
               ) : (
                 <>
@@ -794,7 +896,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
             <AlertCircle className="w-4 h-4 shrink-0 text-[#F21B2D] mt-0.5 sm:mt-0" />
             <span className="leading-relaxed">{errorMessage}</span>
           </div>
-          {imagePreview && (
+          {upload && (
             <button
               type="button"
               onClick={() => handleScan()}

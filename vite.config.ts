@@ -56,6 +56,18 @@ export default defineConfig(() => {
         '@': path.resolve(import.meta.dirname, '.'),
       },
     },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+              { name: 'supabase', test: /node_modules[\\/]@supabase[\\/]/ },
+            ],
+          },
+        },
+      },
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modify—file watching is disabled to prevent flickering during agent edits.

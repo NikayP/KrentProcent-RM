@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { flushSync } from 'react-dom';
 import type { Session } from '@supabase/supabase-js';
 import {
@@ -19,11 +19,30 @@ import { BottomTabBar } from './components/BottomTabBar';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { DrinkForm } from './components/DrinkForm';
 import { Leaderboard } from './components/Leaderboard';
-import { MenuScanner } from './components/MenuScanner';
-import { CrossBarComparison } from './components/CrossBarComparison';
 import { ConfirmModal } from './components/ConfirmModal';
-import { QuickTourModal } from './components/QuickTourModal';
-import { AccountModal, type SyncStatus } from './components/AccountModal';
+import type { SyncStatus } from './types/account';
+
+const loadMenuScanner = () =>
+  import('./components/MenuScanner').then((m) => ({ default: m.MenuScanner }));
+const loadCrossBarComparison = () =>
+  import('./components/CrossBarComparison').then((m) => ({ default: m.CrossBarComparison }));
+
+const MenuScanner = lazy(loadMenuScanner);
+const CrossBarComparison = lazy(loadCrossBarComparison);
+const AccountModal = lazy(() =>
+  import('./components/AccountModal').then((m) => ({ default: m.AccountModal }))
+);
+const QuickTourModal = lazy(() =>
+  import('./components/QuickTourModal').then((m) => ({ default: m.QuickTourModal }))
+);
+
+const TabSkeleton: React.FC = () => (
+  <div className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-6 space-y-4 animate-pulse">
+    <div className="h-6 w-48 rounded-lg bg-[#FFF2F3] dark:bg-[#27272A]" />
+    <div className="h-4 w-72 max-w-full rounded-lg bg-[#FFF2F3] dark:bg-[#27272A]" />
+    <div className="h-36 w-full rounded-2xl bg-[#FFF2F3]/70 dark:bg-[#121214]" />
+  </div>
+);
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useInstallPrompt } from './hooks/useInstallPrompt';
 import { triggerHaptic } from './utils/haptics';
@@ -320,6 +339,20 @@ export default function App() {
     if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
       void navigator.storage.persist().catch(() => {});
     }
+  }, []);
+
+  // Prefetch lazy tab chunks once the browser is idle so tab switches feel instant
+  useEffect(() => {
+    const prefetch = () => {
+      void loadMenuScanner();
+      void loadCrossBarComparison();
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(prefetch, { timeout: 2500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = setTimeout(prefetch, 1200);
+    return () => clearTimeout(timer);
   }, []);
 
   // Expose resetTour helper to window for effortless testing from DevTools console
@@ -855,26 +888,30 @@ export default function App() {
 
         {/* TAB 2: AI Menu Scanner (Central Feature) */}
         {activeTab === 'scanner' && (
-          <MenuScanner
-            onImportDrinks={handleImportDrinks}
-            existingDrinks={drinks}
-            currency={currency}
-            activeBar={activeBar}
-            availableBars={availableBars}
-          />
+          <Suspense fallback={<TabSkeleton />}>
+            <MenuScanner
+              onImportDrinks={handleImportDrinks}
+              existingDrinks={drinks}
+              currency={currency}
+              activeBar={activeBar}
+              availableBars={availableBars}
+            />
+          </Suspense>
         )}
 
         {/* TAB 3: Compare & Manage Bars */}
         {activeTab === 'bars' && (
-          <CrossBarComparison
-            drinks={drinks}
-            extraBars={managedBars}
-            currency={currency}
-            onSelectBar={handleSelectBarFromComparison}
-            onAddBar={handleAddBar}
-            onRenameBar={handleRenameBar}
-            onDeleteBar={handleDeleteBar}
-          />
+          <Suspense fallback={<TabSkeleton />}>
+            <CrossBarComparison
+              drinks={drinks}
+              extraBars={managedBars}
+              currency={currency}
+              onSelectBar={handleSelectBarFromComparison}
+              onAddBar={handleAddBar}
+              onRenameBar={handleRenameBar}
+              onDeleteBar={handleDeleteBar}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -918,47 +955,53 @@ export default function App() {
       />
 
       {/* Account & Cloud Sync Modal */}
-      {isAccountsEnabled && (
-        <AccountModal
-          isOpen={isAccountOpen}
-          onClose={() => {
-            setIsAccountOpen(false);
-            if (isRecovery) {
+      {isAccountsEnabled && isAccountOpen && (
+        <Suspense fallback={null}>
+          <AccountModal
+            isOpen={isAccountOpen}
+            onClose={() => {
+              setIsAccountOpen(false);
+              if (isRecovery) {
+                setIsRecovery(false);
+              }
+            }}
+            session={session}
+            username={username}
+            syncStatus={syncStatus}
+            isRecovery={isRecovery}
+            onRecoveryComplete={() => {
               setIsRecovery(false);
-            }
-          }}
-          session={session}
-          username={username}
-          syncStatus={syncStatus}
-          isRecovery={isRecovery}
-          onRecoveryComplete={() => {
-            setIsRecovery(false);
-            if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
-              window.history.replaceState(
-                null,
-                '',
-                window.location.pathname + window.location.search
-              );
-            }
-          }}
-          onBeforeAuth={(mode) => {
-            pendingAuthModeRef.current = mode;
-          }}
-          onAuthErrorReset={() => {
-            pendingAuthModeRef.current = null;
-          }}
-          onRequestDeleteAccount={() => setDeleteAccountPending(true)}
-          onShowToast={showToast}
-          localDrinkCount={drinks.length}
-        />
+              if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+                window.history.replaceState(
+                  null,
+                  '',
+                  window.location.pathname + window.location.search
+                );
+              }
+            }}
+            onBeforeAuth={(mode) => {
+              pendingAuthModeRef.current = mode;
+            }}
+            onAuthErrorReset={() => {
+              pendingAuthModeRef.current = null;
+            }}
+            onRequestDeleteAccount={() => setDeleteAccountPending(true)}
+            onShowToast={showToast}
+            localDrinkCount={drinks.length}
+          />
+        </Suspense>
       )}
 
       {/* Interactieve Snelle Rondleiding Modal */}
-      <QuickTourModal
-        isOpen={isTourOpen}
-        onClose={handleCloseTour}
-        onNavigateTab={switchTab}
-      />
+      {isTourOpen && (
+        <Suspense fallback={null}>
+          <QuickTourModal
+            isOpen={isTourOpen}
+            onClose={handleCloseTour}
+            onNavigateTab={switchTab}
+          />
+        </Suspense>
+      )}
 
       {/* Footer & Fallback / Preset Restore Bar */}
       <footer className="mt-auto border-t border-[#E4E4E7] dark:border-[#27272A] bg-[#FFFFFF]/80 dark:bg-[#18181B]/90 pt-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] sm:py-6 text-xs text-zinc-500 dark:text-zinc-400">

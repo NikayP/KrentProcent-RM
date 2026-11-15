@@ -6,6 +6,13 @@ import {
   normalizeCafePrice,
 } from '../src/utils/calculator.js';
 import { parseMenuFallback } from '../src/utils/menuParser.js';
+import {
+  ALLOWED_SCAN_MIME_TYPES,
+  normalizeScanMimeType,
+  type AllowedScanMimeType,
+} from './scanMime.js';
+
+export { ALLOWED_SCAN_MIME_TYPES, normalizeScanMimeType, type AllowedScanMimeType };
 
 // Lazily initialize Google GenAI client so env vars loaded at runtime are always picked up
 let aiClient: GoogleGenAI | null = null;
@@ -42,12 +49,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { imageBase64, mimeType = 'image/jpeg', textInput } = req.body || {};
+    const { imageBase64, textInput } = req.body || {};
 
     if (!imageBase64 && !textInput) {
-      return res.status(400).json({ error: 'Please provide an image or menu text.' });
+      return res.status(400).json({ error: 'Please provide an image, PDF, or menu text.' });
     }
 
+    let normalizedMime: AllowedScanMimeType = 'image/jpeg';
+    if (imageBase64) {
+      const rawMime = req.body?.mimeType === undefined ? 'image/jpeg' : req.body.mimeType;
+      const validated = normalizeScanMimeType(rawMime);
+      if (!validated) {
+        return res.status(400).json({
+          error: 'Unsupported file type. Please upload a JPG, PNG, WebP, HEIC image or PDF.',
+        });
+      }
+      normalizedMime = validated;
+    }
+
+    const isPdf = normalizedMime === 'application/pdf';
     const userSpecifiedBar = (req.body?.barName || '').trim();
     const scanStartTime = Date.now();
 
@@ -93,17 +113,17 @@ Rules:
 - Every drink line MUST end with its numeric Price (e.g. 5,1 -> 5.10, (4,90) -> 4.90, €3,60 -> 3.60). Do NOT confuse Price with ABV%!
 - CRITICAL: If a drink has "0.0", "0,0", or "Alcoholvrij" in its name (e.g. Heineken 0.0, Amstel Radler 0.0, Guinness 0.0, Affligem 0.0, Paulaner 0.0, Kasteel Rouge 0.0), its ABV MUST be 0.0 (NEVER 5.0!).
 - Defaults if not printed: vaasje=250, fluitje=200, bottle/speciaalbier=330, weizen/pint=500, wine=150, shot=35, pilsabv=5.0.
-Example:
+${isPdf ? '- The menu may span multiple pages; include drinks from every page.\n' : ''}Example:
 Brand Pilsener|b|250|5.0|3.70
 Heineken 0.0|b|330|0.0|3.50
 Westmalle Tripel|b|330|9.5|5.80`;
 
     const contents: any[] = [];
     if (imageBase64) {
-      const cleanBase64 = imageBase64.replace(/^data:[a-zA-Z0-9/+-]+;base64,/, '');
+      const cleanBase64 = imageBase64.replace(/^data:[^,]+;base64,/, '');
       contents.push({
         inlineData: {
-          mimeType: mimeType,
+          mimeType: normalizedMime,
           data: cleanBase64,
         },
       });
@@ -221,7 +241,7 @@ Westmalle Tripel|b|330|9.5|5.80`;
     // Wave 1: Parallel race of the fastest Flash-Lite and Flash models
     let winningResult = await raceModelWave(
       ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.5-flash'],
-      12000
+      isPdf ? 25000 : 12000
     );
 
     // Wave 2: Parallel fallback wave only if Wave 1 returned 0 drinks
@@ -229,7 +249,7 @@ Westmalle Tripel|b|330|9.5|5.80`;
       console.log('[scan-menu] Wave 1 returned 0 drinks, launching Wave 2 fallback race...');
       winningResult = await raceModelWave(
         ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'],
-        15000
+        isPdf ? 20000 : 15000
       );
     }
 

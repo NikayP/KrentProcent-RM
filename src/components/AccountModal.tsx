@@ -28,7 +28,9 @@ import {
   validateUsername,
 } from '../utils/supabase';
 
-export type SyncStatus = 'idle' | 'saving' | 'saved' | 'offline';
+import type { SyncStatus } from '../types/account';
+
+export type { SyncStatus };
 type AuthView = 'login' | 'register' | 'forgot';
 
 interface AccountModalProps {
