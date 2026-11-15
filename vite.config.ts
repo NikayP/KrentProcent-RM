@@ -16,72 +16,7 @@ export default defineConfig(() => {
           'favicon.svg',
           'apple-touch-icon-180x180.png',
         ],
-        manifest: {
-          id: '/',
-          name: 'KrentProcent RM',
-          short_name: 'KrentProcent',
-          description:
-            'Smart bar alcohol value calculator and menu comparator. Compare volume, price, and ABV to find the best bang for your buck.',
-          start_url: '/',
-          scope: '/',
-          display: 'standalone',
-          orientation: 'portrait',
-          theme_color: '#18181B',
-          background_color: '#121214',
-          lang: 'en',
-          categories: ['food', 'utilities', 'lifestyle'],
-          icons: [
-            {
-              src: 'pwa-64x64.png',
-              sizes: '64x64',
-              type: 'image/png',
-            },
-            {
-              src: 'pwa-192x192.png',
-              sizes: '192x192',
-              type: 'image/png',
-            },
-            {
-              src: 'pwa-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-            },
-            {
-              src: 'maskable-icon-512x512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-          ],
-          shortcuts: [
-            {
-              name: 'Scan Menu',
-              short_name: 'Scan',
-              description: 'Scan a bar menu with camera or text',
-              url: '/?tab=scanner',
-              icons: [
-                {
-                  src: 'pwa-192x192.png',
-                  sizes: '192x192',
-                  type: 'image/png',
-                },
-              ],
-            },
-            {
-              name: 'Compare Bars',
-              short_name: 'Bars',
-              description: 'Compare drink value across bars',
-              url: '/?tab=bars',
-              icons: [
-                {
-                  src: 'pwa-192x192.png',
-                  sizes: '192x192',
-                  type: 'image/png',
-                },
-              ],
-            },
-          ],
-        },
+        manifest: false,
         workbox: {
           cleanupOutdatedCaches: true,
           clientsClaim: true,

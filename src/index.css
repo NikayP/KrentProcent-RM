@@ -36,8 +36,13 @@
 
   body {
     font-family: var(--font-sans);
+    background-color: #FFFFFF;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
+  }
+
+  html.dark body {
+    background-color: #18181B;
   }
 
   button,

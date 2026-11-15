@@ -192,9 +192,12 @@ export default function App() {
   useEffect(() => {
     const root = document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
-    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
-    if (themeColorMeta) {
-      themeColorMeta.setAttribute('content', theme === 'dark' ? '#18181B' : '#FFFFFF');
+    const themeColorMetas = Array.from(document.querySelectorAll('meta[name="theme-color"]'));
+    const nextColor = theme === 'dark' ? '#18181B' : '#FFFFFF';
+    if (themeColorMetas.length > 0) {
+      themeColorMetas[0].removeAttribute('media');
+      themeColorMetas[0].setAttribute('content', nextColor);
+      themeColorMetas.slice(1).forEach((m) => m.remove());
     }
     try {
       localStorage.setItem(THEME_STORAGE_KEY, theme);
