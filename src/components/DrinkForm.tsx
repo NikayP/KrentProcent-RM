@@ -117,6 +117,13 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
   const [justAddedMessage, setJustAddedMessage] = useState<string | null>(null);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const justAddedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (justAddedTimerRef.current) clearTimeout(justAddedTimerRef.current);
+    };
+  }, []);
 
   // Sync barName when activeBar changes or when bar is deleted
   useEffect(() => {
@@ -197,7 +204,11 @@ export const DrinkForm: React.FC<DrinkFormProps> = ({
         ? `Updated in ${resolvedBarName}`
         : `Added to ${resolvedBarName}`
     );
-    setTimeout(() => setJustAddedMessage(null), 1600);
+    if (justAddedTimerRef.current) clearTimeout(justAddedTimerRef.current);
+    justAddedTimerRef.current = setTimeout(() => {
+      justAddedTimerRef.current = null;
+      setJustAddedMessage(null);
+    }, 1600);
 
     setName('');
     setNotes('');

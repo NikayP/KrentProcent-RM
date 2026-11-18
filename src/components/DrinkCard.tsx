@@ -26,7 +26,7 @@ interface DrinkCardProps {
   otherBarsCount?: number;
 }
 
-export const DrinkCard: React.FC<DrinkCardProps> = ({
+export const DrinkCard: React.FC<DrinkCardProps> = React.memo(({
   drink,
   currency,
   onDelete,
@@ -111,10 +111,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
         <form onSubmit={handleSaveEdit} className="space-y-3 pt-1">
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 text-xs">
             <div className="sm:col-span-4">
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-name-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 Drink Name
               </label>
               <input
+                id={`edit-name-${drink.id}`}
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
@@ -124,10 +128,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
             </div>
 
             <div className="sm:col-span-3">
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-bar-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 Bar / Venue
               </label>
               <input
+                id={`edit-bar-${drink.id}`}
                 type="text"
                 list={`bars-list-${drink.id}`}
                 value={editBar}
@@ -145,10 +153,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-cat-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 Category
               </label>
               <select
+                id={`edit-cat-${drink.id}`}
                 value={editCategory}
                 onChange={(e) => setEditCategory(e.target.value as DrinkCategory)}
                 className="w-full bg-[#FFF2F3]/50 dark:bg-[#121214] text-[#18181B] dark:text-[#FFFFFF] rounded-xl px-2 py-1.5 border border-[#E4E4E7] dark:border-[#27272A] focus:border-[#F21B2D] focus:outline-none"
@@ -163,10 +175,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
             </div>
 
             <div className="sm:col-span-3">
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-notes-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 Notes
               </label>
               <input
+                id={`edit-notes-${drink.id}`}
                 type="text"
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
@@ -178,10 +194,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
 
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 items-end text-xs">
             <div>
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-vol-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 Volume (ml)
               </label>
               <input
+                id={`edit-vol-${drink.id}`}
                 type="number"
                 min="1"
                 step="1"
@@ -193,10 +213,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
             </div>
 
             <div>
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-abv-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 ABV (%)
               </label>
               <input
+                id={`edit-abv-${drink.id}`}
                 type="number"
                 min="0"
                 max="100"
@@ -209,10 +233,14 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
             </div>
 
             <div>
-              <label className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1">
+              <label
+                htmlFor={`edit-price-${drink.id}`}
+                className="block text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold mb-1"
+              >
                 Price ({currency})
               </label>
               <input
+                id={`edit-price-${drink.id}`}
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -407,4 +435,6 @@ export const DrinkCard: React.FC<DrinkCardProps> = ({
       )}
     </div>
   );
-};
+});
+
+DrinkCard.displayName = 'DrinkCard';

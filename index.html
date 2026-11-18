@@ -19,6 +19,27 @@
     <meta property="og:description" content="Smart bar alcohol value calculator and menu comparator. Compare volume, price, and ABV to find the best bang for your buck, with instant menu screenshot scanning." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('krentprocent_theme_v1');
+          var isDark =
+            saved === 'dark' ||
+            (saved !== 'light' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          }
+          var metas = document.querySelectorAll('meta[name="theme-color"]');
+          if (metas.length > 0) {
+            metas[0].removeAttribute('media');
+            metas[0].setAttribute('content', isDark ? '#18181B' : '#FFFFFF');
+            for (var i = 1; i < metas.length; i++) metas[i].remove();
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

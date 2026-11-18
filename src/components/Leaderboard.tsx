@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useDeferredValue } from 'react';
 import {
   DrinkItem,
   rankDrinks,
@@ -19,11 +19,9 @@ import {
   Search,
 } from 'lucide-react';
 import { CategoryIcon, DRINK_CATEGORY_META } from './CategoryIcon';
-import {
-  preloadShareCardAssets,
-  shareTopThreeImage,
-  type ShareSortOption,
-} from '../utils/shareCard';
+import type { ShareSortOption } from '../utils/shareCard';
+
+const loadShareCard = () => import('../utils/shareCard');
 
 interface LeaderboardProps {
   drinks: DrinkItem[];
@@ -51,23 +49,41 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('krent');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [shareStatus, setShareStatus] = useState<'idle' | 'generating' | 'shared' | 'copied' | 'downloaded'>('idle');
 
   useEffect(() => {
-    preloadShareCardAssets();
+    const preload = () => {
+      void loadShareCard().then((m) => m.preloadShareCardAssets());
+    };
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(preload, { timeout: 3000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = setTimeout(preload, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Map of (normalizedDrinkKey::volumeMl) -> Set of normalizedBarKeys across the entire database
-  const crossBarPresenceMap = useMemo(() => {
-    const map = new Map<string, Set<string>>();
+  // Precompute other-bar counts per drink ID in one O(D) pass (avoids normalizing keys during render)
+  const otherBarsCountByDrinkId = useMemo(() => {
+    const sigToBars = new Map<string, Set<string>>();
+    const drinkSigs = new Map<string, string>();
     for (const d of drinks) {
       const sig = `${normalizeDrinkKey(d.name)}::${Math.round(d.volumeMl)}`;
+      drinkSigs.set(d.id, sig);
       const barKey = normalizeBarKey(d.barName || DEFAULT_BAR_NAME);
-      const set = map.get(sig) || new Set<string>();
+      let set = sigToBars.get(sig);
+      if (!set) {
+        set = new Set<string>();
+        sigToBars.set(sig, set);
+      }
       set.add(barKey);
-      map.set(sig, set);
     }
-    return map;
+    const counts = new Map<string, number>();
+    for (const [id, sig] of drinkSigs.entries()) {
+      counts.set(id, Math.max(0, (sigToBars.get(sig)?.size || 1) - 1));
+    }
+    return counts;
   }, [drinks]);
 
   // Filter drinks to active bar first, or all
@@ -85,8 +101,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       list = list.filter((d) => d.category === selectedCategory);
     }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
+    if (deferredSearchQuery.trim()) {
+      const q = deferredSearchQuery.trim().toLowerCase();
       list = list.filter(
         (d) =>
           d.name.toLowerCase().includes(q) ||
@@ -106,7 +122,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     }
 
     return list;
-  }, [ranked, selectedCategory, searchQuery, sortBy]);
+  }, [ranked, selectedCategory, deferredSearchQuery, sortBy]);
 
   const bestOverall = ranked[0];
   const topThree = useMemo(() => filtered.slice(0, 3), [filtered]);
@@ -115,6 +131,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     if (topThree.length === 0 || shareStatus === 'generating') return;
     setShareStatus('generating');
     try {
+      const { shareTopThreeImage } = await loadShareCard();
       const outcome = await shareTopThreeImage({
         drinks: topThree,
         activeBar,
@@ -149,6 +166,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
+            type="button"
             onClick={onLoadPresets}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold text-sm transition-all shadow-sm flex items-center justify-center gap-2"
           >
@@ -191,6 +209,12 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <button
               type="button"
               onClick={handleShareTopThree}
+              onMouseEnter={() => {
+                void loadShareCard().then((m) => m.preloadShareCardAssets());
+              }}
+              onFocus={() => {
+                void loadShareCard().then((m) => m.preloadShareCardAssets());
+              }}
               disabled={shareStatus === 'generating'}
               title={`Share current Top ${topThree.length} as image`}
               className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 disabled:opacity-60"
@@ -223,6 +247,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         <div className="flex flex-wrap items-center gap-1.5">
           <Filter className="w-3.5 h-3.5 text-zinc-400 mr-1 shrink-0" />
           <button
+            type="button"
             onClick={() => setSelectedCategory('all')}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
               selectedCategory === 'all'
@@ -237,6 +262,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             return (
               <button
                 key={catId}
+                type="button"
                 onClick={() => setSelectedCategory(catId)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap inline-flex items-center gap-1.5 ${
                   isSelected
@@ -302,25 +328,19 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             No drinks matching this filter at {activeBar === 'all' ? 'any bar' : activeBar}.
           </div>
         ) : (
-          filtered.map((drink) => {
-            const sig = `${normalizeDrinkKey(drink.name)}::${Math.round(drink.volumeMl)}`;
-            const totalBarsWithDrink = crossBarPresenceMap.get(sig)?.size || 1;
-            const otherBarsCount = Math.max(0, totalBarsWithDrink - 1);
-
-            return (
-              <DrinkCard
-                key={drink.id}
-                drink={drink}
-                currency={currency}
-                onDelete={onDeleteDrink}
-                onUpdate={onUpdateDrink}
-                onSelectBar={onSelectBar}
-                availableBars={availableBars}
-                bestScore={bestOverall?.pureAlcoholPerCurrency || 0}
-                otherBarsCount={otherBarsCount}
-              />
-            );
-          })
+          filtered.map((drink) => (
+            <DrinkCard
+              key={drink.id}
+              drink={drink}
+              currency={currency}
+              onDelete={onDeleteDrink}
+              onUpdate={onUpdateDrink}
+              onSelectBar={onSelectBar}
+              availableBars={availableBars}
+              bestScore={bestOverall?.pureAlcoholPerCurrency || 0}
+              otherBarsCount={otherBarsCountByDrinkId.get(drink.id) || 0}
+            />
+          ))
         )}
       </div>
     </div>

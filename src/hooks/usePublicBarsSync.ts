@@ -8,7 +8,7 @@ import {
   unpublishBar,
 } from '../utils/publicBars';
 import { hashBarDrinks, preparePublicDrinks, sanitizeCity } from '../utils/publicBarsCore';
-import { supabase } from '../utils/supabase';
+import { isAccountsEnabled } from '../utils/supabase';
 
 export interface BarShareInfo {
   isPublic: boolean;
@@ -40,7 +40,7 @@ export function usePublicBarsSync({
 
   // Load current user's public bars on login; clear on logout
   useEffect(() => {
-    if (!supabase || !session?.user?.id) {
+    if (!isAccountsEnabled || !session?.user?.id) {
       setPublicBarsMap({});
       setUpdatingBarKey(null);
       return;
@@ -66,45 +66,87 @@ export function usePublicBarsSync({
     };
   }, [session?.user?.id]);
 
+  const pendingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncDirtyPublicBarsNow = useCallback((userId: string, currentDrinks: DrinkItem[]) => {
+    if (sessionRef.current?.user?.id !== userId) return;
+    for (const pub of Object.values(mapRef.current)) {
+      const prepared = preparePublicDrinks(currentDrinks, pub.barName);
+      const nextHash = hashBarDrinks(prepared);
+      if (nextHash !== pub.hash) {
+        void publishBar({
+          userId,
+          barName: pub.barName,
+          city: pub.city,
+          drinks: currentDrinks,
+        })
+          .then((saved) => {
+            if (sessionRef.current?.user?.id !== userId) return;
+            setPublicBarsMap((prev) => ({
+              ...prev,
+              [saved.barKey]: saved,
+            }));
+          })
+          .catch(() => {
+            // Silent retry on next change
+          });
+      }
+    }
+  }, []);
+
   // Auto-sync modified drinks for bars the user chose to make public
   useEffect(() => {
     const userId = session?.user?.id;
-    if (!supabase || !userId || !syncReady) return;
+    if (!isAccountsEnabled || !userId || !syncReady) return;
 
     const currentEntries = Object.values(mapRef.current);
     if (currentEntries.length === 0) return;
 
-    const timer = setTimeout(() => {
-      for (const pub of Object.values(mapRef.current)) {
-        const prepared = preparePublicDrinks(drinks, pub.barName);
-        const nextHash = hashBarDrinks(prepared);
-        if (nextHash !== pub.hash) {
-          void publishBar({
-            userId,
-            barName: pub.barName,
-            city: pub.city,
-            drinks,
-          })
-            .then((saved) => {
-              setPublicBarsMap((prev) => ({
-                ...prev,
-                [saved.barKey]: saved,
-              }));
-            })
-            .catch(() => {
-              // Silent retry on next change
-            });
-        }
-      }
+    if (pendingSyncTimerRef.current) {
+      clearTimeout(pendingSyncTimerRef.current);
+    }
+
+    pendingSyncTimerRef.current = setTimeout(() => {
+      pendingSyncTimerRef.current = null;
+      syncDirtyPublicBarsNow(userId, drinks);
     }, 1500);
 
-    return () => clearTimeout(timer);
-  }, [drinks, session?.user?.id, syncReady]);
+    return () => {
+      if (pendingSyncTimerRef.current) {
+        clearTimeout(pendingSyncTimerRef.current);
+        pendingSyncTimerRef.current = null;
+      }
+    };
+  }, [drinks, session?.user?.id, syncReady, syncDirtyPublicBarsNow]);
+
+  // Flush pending public-bar updates when PWA is backgrounded or closed
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!isAccountsEnabled || !userId || !syncReady) return;
+
+    const flush = () => {
+      if (!pendingSyncTimerRef.current) return;
+      clearTimeout(pendingSyncTimerRef.current);
+      pendingSyncTimerRef.current = null;
+      syncDirtyPublicBarsNow(userId, drinksRef.current);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [session?.user?.id, syncReady, syncDirtyPublicBarsNow]);
 
   const setBarPublic = useCallback(
     async (barName: string, isPublic: boolean, city: string | null) => {
       const userId = sessionRef.current?.user?.id;
-      if (!supabase || !userId) return;
+      if (!isAccountsEnabled || !userId) return;
 
       const barKey = normalizeBarKey(barName);
       const existing = mapRef.current[barKey];
@@ -155,7 +197,7 @@ export function usePublicBarsSync({
   const handleBarRenamed = useCallback(
     (oldName: string, newCanonicalName: string, nextDrinks: DrinkItem[]) => {
       const userId = sessionRef.current?.user?.id;
-      if (!supabase || !userId) return;
+      if (!isAccountsEnabled || !userId) return;
 
       const oldKey = normalizeBarKey(oldName);
       const newKey = normalizeBarKey(newCanonicalName);
@@ -193,7 +235,7 @@ export function usePublicBarsSync({
 
   const handleBarDeleted = useCallback((barName: string) => {
     const userId = sessionRef.current?.user?.id;
-    if (!supabase || !userId) return;
+    if (!isAccountsEnabled || !userId) return;
 
     const barKey = normalizeBarKey(barName);
     if (!mapRef.current[barKey]) return;

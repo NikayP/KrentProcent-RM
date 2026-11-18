@@ -1,4 +1,4 @@
-import { ComponentType, lazy } from 'react';
+import { type ComponentType, lazy } from 'react';
 
 const CHUNK_RELOAD_KEY = 'krentprocent_chunk_reload_ts';
 const RELOAD_COOLDOWN_MS = 15_000;

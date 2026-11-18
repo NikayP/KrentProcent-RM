@@ -1,4 +1,4 @@
-import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import {
   type DrinkItem,
   sanitizeDrinkItem,
@@ -25,29 +25,82 @@ const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
 export const isAccountsEnabled = Boolean(supabaseUrl && supabaseAnonKey);
 
-export const supabase: SupabaseClient | null = isAccountsEnabled
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-    })
-  : null;
+let supabaseClientPromise: Promise<SupabaseClient | null> | null = null;
 
-function requireClient(): SupabaseClient {
-  if (!supabase) {
+/**
+ * Checks whether a persisted Supabase session or auth callback URL parameter exists
+ * without downloading or initializing the @supabase/supabase-js SDK.
+ */
+export function hasLikelySupabaseSession(): boolean {
+  if (!isAccountsEnabled || typeof window === 'undefined') return false;
+
+  const hash = window.location.hash;
+  const search = window.location.search;
+  if (
+    hash.includes('access_token=') ||
+    hash.includes('type=recovery') ||
+    hash.includes('error_description=') ||
+    search.includes('code=')
+  ) {
+    return true;
+  }
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+        const val = localStorage.getItem(key);
+        if (val && val !== 'null' && val !== '{}') {
+          return true;
+        }
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+
+  return false;
+}
+
+/**
+ * Lazily loads @supabase/supabase-js and returns a singleton Supabase client.
+ */
+export function getSupabaseClient(): Promise<SupabaseClient | null> {
+  if (!isAccountsEnabled) return Promise.resolve(null);
+  if (!supabaseClientPromise) {
+    supabaseClientPromise = import('@supabase/supabase-js')
+      .then(({ createClient }) =>
+        createClient(supabaseUrl, supabaseAnonKey, {
+          auth: {
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true,
+          },
+        })
+      )
+      .catch((err) => {
+        supabaseClientPromise = null;
+        throw err;
+      });
+  }
+  return supabaseClientPromise;
+}
+
+async function requireClient(): Promise<SupabaseClient> {
+  const client = await getSupabaseClient();
+  if (!client) {
     throw new Error('Accounts are not configured.');
   }
-  return supabase;
+  return client;
 }
 
 export async function checkUsernameAvailable(username: string): Promise<boolean | null> {
-  if (!supabase) return null;
+  const client = await getSupabaseClient();
+  if (!client) return null;
   const normalized = normalizeUsername(username);
   if (!USERNAME_REGEX.test(normalized)) return null;
 
-  const { data, error } = await supabase.rpc('is_username_available', {
+  const { data, error } = await client.rpc('is_username_available', {
     name: normalized,
   });
   if (error || typeof data !== 'boolean') {
@@ -61,7 +114,7 @@ export async function signUpWithUsername(params: {
   email: string;
   password: string;
 }): Promise<{ session: Session | null; needsEmailConfirmation: boolean }> {
-  const client = requireClient();
+  const client = await requireClient();
 
   const usernameError = validateUsername(params.username);
   if (usernameError) throw new Error(usernameError);
@@ -109,7 +162,7 @@ export async function logInWithIdentifier(
   identifier: string,
   password: string
 ): Promise<Session> {
-  const client = requireClient();
+  const client = await requireClient();
   const trimmed = identifier.trim();
   if (!trimmed || !password) {
     throw new Error('Please enter your username or email and password.');
@@ -145,7 +198,7 @@ export async function logInWithIdentifier(
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  const client = requireClient();
+  const client = await requireClient();
   const trimmed = email.trim();
   if (!trimmed || !trimmed.includes('@')) {
     throw new Error('Please enter a valid email address.');
@@ -161,7 +214,7 @@ export async function requestPasswordReset(email: string): Promise<void> {
 }
 
 export async function updatePassword(newPassword: string): Promise<void> {
-  const client = requireClient();
+  const client = await requireClient();
   const passwordError = validatePassword(newPassword);
   if (passwordError) throw new Error(passwordError);
 
@@ -172,7 +225,7 @@ export async function updatePassword(newPassword: string): Promise<void> {
 }
 
 export async function changeUsername(newName: string): Promise<string> {
-  const client = requireClient();
+  const client = await requireClient();
   const usernameError = validateUsername(newName);
   if (usernameError) throw new Error(usernameError);
 
@@ -195,7 +248,7 @@ export async function changePassword(
   currentPassword: string,
   newPassword: string
 ): Promise<void> {
-  const client = requireClient();
+  const client = await requireClient();
   if (!currentPassword) {
     throw new Error('Please enter your current password.');
   }
@@ -229,12 +282,13 @@ export async function changePassword(
 }
 
 export async function logOut(): Promise<void> {
-  if (!supabase) return;
-  await supabase.auth.signOut();
+  const client = await getSupabaseClient();
+  if (!client) return;
+  await client.auth.signOut();
 }
 
 export async function deleteOwnAccount(): Promise<void> {
-  const client = requireClient();
+  const client = await requireClient();
   const { error } = await client.rpc('delete_own_account');
   if (error) {
     throw new Error(mapAuthError(error.message));
@@ -243,8 +297,9 @@ export async function deleteOwnAccount(): Promise<void> {
 }
 
 export async function getUsername(userId: string): Promise<string | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
+  const client = await getSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
     .from('profiles')
     .select('username')
     .eq('user_id', userId)
@@ -259,7 +314,7 @@ export async function loadUserData(userId: string): Promise<{
   managedBars: string[];
   updatedAt: string | null;
 }> {
-  const client = requireClient();
+  const client = await requireClient();
   const { data, error } = await client
     .from('user_data')
     .select('drinks, managed_bars, updated_at')
@@ -293,7 +348,7 @@ export async function saveUserData(
   drinks: DrinkItem[],
   managedBars: string[]
 ): Promise<string> {
-  const client = requireClient();
+  const client = await requireClient();
   const updatedAt = new Date().toISOString();
 
   const { error } = await client

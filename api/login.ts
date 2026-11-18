@@ -1,8 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { SlidingWindowRateLimiter, getClientIp } from './rateLimit.ts';
 
 export const GENERIC_LOGIN_ERROR = 'Wrong username/email or password.';
 export const USERNAME_REGEX = /^[a-z0-9._-]{3,24}$/;
+
+const loginRateLimiter = new SlidingWindowRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 15,
+});
+
+const MIN_AUTH_FAILURE_MS = 280;
 
 export function isEmailIdentifier(identifier: string): boolean {
   return identifier.trim().includes('@');
@@ -100,6 +108,34 @@ export async function executeLogin(rawBody: unknown, deps: LoginDeps): Promise<L
   };
 }
 
+let cachedClients: {
+  key: string;
+  adminClient: SupabaseClient;
+  anonClient: SupabaseClient;
+} | null = null;
+
+function getSupabaseClients(
+  supabaseUrl: string,
+  anonKey: string,
+  serviceRoleKey: string
+): { adminClient: SupabaseClient; anonClient: SupabaseClient } {
+  const key = `${supabaseUrl}|${anonKey}|${serviceRoleKey}`;
+  if (cachedClients && cachedClients.key === key) {
+    return {
+      adminClient: cachedClients.adminClient,
+      anonClient: cachedClients.anonClient,
+    };
+  }
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const anonClient = createClient(supabaseUrl, anonKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  cachedClients = { key, adminClient, anonClient };
+  return { adminClient, anonClient };
+}
+
 function buildSupabaseDeps(): LoginDeps | null {
   const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '').trim();
   const anonKey = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
@@ -109,12 +145,7 @@ function buildSupabaseDeps(): LoginDeps | null {
     return null;
   }
 
-  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const anonClient = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const { adminClient, anonClient } = getSupabaseClients(supabaseUrl, anonKey, serviceRoleKey);
 
   return {
     async findUserIdByUsername(username: string) {
@@ -151,13 +182,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
+  const ip = getClientIp(req);
+  const limit = loginRateLimiter.check(ip);
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds));
+    return res.status(429).json({
+      error: 'Too many login attempts. Please try again later.',
+    });
+  }
+
   const deps = buildSupabaseDeps();
   if (!deps) {
     return res.status(503).json({ error: 'Accounts are not configured on this server.' });
   }
 
+  const startedAt = Date.now();
   try {
     const result = await executeLogin(req.body, deps);
+    if (result.status === 401) {
+      // Constant minimum duration + small jitter mitigates timing-based username enumeration
+      const targetMs = MIN_AUTH_FAILURE_MS + Math.floor(Math.random() * 40);
+      const remainingMs = targetMs - (Date.now() - startedAt);
+      if (remainingMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingMs));
+      }
+    }
     return res.status(result.status).json(result.body);
   } catch (err) {
     console.error('[api/login] Unexpected error:', err);

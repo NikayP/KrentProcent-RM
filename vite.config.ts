@@ -11,11 +11,6 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'prompt',
-        includeAssets: [
-          'favicon.ico',
-          'favicon.svg',
-          'apple-touch-icon-180x180.png',
-        ],
         manifest: false,
         workbox: {
           cleanupOutdatedCaches: true,
@@ -23,6 +18,7 @@ export default defineConfig(() => {
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api\//],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globIgnores: ['**/pwa-512x512.png', '**/maskable-icon-512x512.png'],
           runtimeCaching: [
             {
               urlPattern: /^\/api\/(scan-menu|login)/,

@@ -1,11 +1,16 @@
 -- KrentProcent: Supabase schema voor accounts & opgeslagen scans
 -- Voer dit eenmalig uit in de Supabase SQL Editor.
 
+-- 0. Extensies
+create extension if not exists pg_trgm;
+
 -- 1. Gebruikersnamen (uniek, lowercase)
 create table public.profiles (
   user_id  uuid primary key references auth.users(id) on delete cascade,
   username text not null unique check (username ~ '^[a-z0-9._-]{3,24}$')
 );
+
+create index profiles_username_prefix_idx on public.profiles (username text_pattern_ops);
 
 -- 2. Opgeslagen scans per gebruiker
 create table public.user_data (
@@ -13,7 +18,10 @@ create table public.user_data (
   drinks       jsonb not null default '[]'::jsonb,
   managed_bars jsonb not null default '[]'::jsonb,
   updated_at   timestamptz not null default now(),
-  constraint user_data_size check (pg_column_size(drinks) < 2000000)
+  constraint user_data_drinks_array check (jsonb_typeof(drinks) = 'array'),
+  constraint user_data_bars_array check (jsonb_typeof(managed_bars) = 'array'),
+  constraint user_data_size check (pg_column_size(drinks) < 2000000),
+  constraint user_data_bars_size check (pg_column_size(managed_bars) < 50000)
 );
 
 -- 3. Row Level Security: iedere gebruiker ziet/bewerkt alleen zijn eigen rijen
@@ -88,21 +96,25 @@ end $$;
 revoke all on function public.change_username(text) from public, anon;
 grant execute on function public.change_username(text) to authenticated;
 
--- 8. Opt-in openbare bars & Discover zoeken (migratie 0003)
+-- 8. Opt-in openbare bars & Discover zoeken (migratie 0003 & 0004)
 create table public.public_bars (
-  id         uuid primary key default gen_random_uuid(),
-  user_id    uuid not null references auth.users(id) on delete cascade,
-  bar_key    text not null,
-  bar_name   text not null check (char_length(bar_name) between 1 and 80),
-  city       text check (city is null or char_length(city) <= 60),
-  drinks     jsonb not null default '[]'::jsonb
-             check (jsonb_typeof(drinks) = 'array' and pg_column_size(drinks) < 200000),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  bar_key     text not null,
+  bar_name    text not null check (char_length(bar_name) between 1 and 80),
+  city        text check (city is null or char_length(city) <= 60),
+  drinks      jsonb not null default '[]'::jsonb
+              check (jsonb_typeof(drinks) = 'array' and pg_column_size(drinks) < 200000),
+  drink_count int generated always as (jsonb_array_length(drinks)) stored,
+  drinks_hash text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
   unique (user_id, bar_key)
 );
 
 create index public_bars_updated_idx on public.public_bars (updated_at desc);
+create index public_bars_bar_name_trgm_idx on public.public_bars using gin (bar_name gin_trgm_ops);
+create index public_bars_city_trgm_idx on public.public_bars using gin (city gin_trgm_ops);
 
 alter table public.public_bars enable row level security;
 
@@ -121,6 +133,7 @@ create policy "owner deletes" on public.public_bars
 create or replace function public.enforce_public_bar_limit() returns trigger
 language plpgsql set search_path = public as $$
 begin
+  perform pg_advisory_xact_lock(hashtext(new.user_id::text));
   if (select count(*) from public.public_bars where user_id = new.user_id) >= 50 then
     raise exception 'public_bar_limit';
   end if;
@@ -149,7 +162,7 @@ language sql stable security definer set search_path = public as $$
          p.username,
          pb.bar_name,
          pb.city,
-         jsonb_array_length(pb.drinks)::int as drink_count,
+         pb.drink_count,
          pb.updated_at
   from public.public_bars pb
   join public.profiles p on p.user_id = pb.user_id

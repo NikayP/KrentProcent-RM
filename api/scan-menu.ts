@@ -1,18 +1,23 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
-import {
-  sanitizeDrinkItem,
-  isExplicitZeroAlcohol,
-  normalizeCafePrice,
-} from '../src/utils/calculator.js';
 import { parseMenuFallback } from '../src/utils/menuParser.js';
 import {
   ALLOWED_SCAN_MIME_TYPES,
   normalizeScanMimeType,
   type AllowedScanMimeType,
 } from './scanMime.js';
+import { SlidingWindowRateLimiter, getClientIp } from './rateLimit.ts';
+import { parseVisionResponse } from './visionParser.ts';
 
-export { ALLOWED_SCAN_MIME_TYPES, normalizeScanMimeType, type AllowedScanMimeType };
+export { ALLOWED_SCAN_MIME_TYPES, normalizeScanMimeType, parseVisionResponse, type AllowedScanMimeType };
+
+const MAX_BASE64_LENGTH = 6_000_000; // ~4.5 MB raw payload
+const MAX_TEXT_LENGTH = 50_000;
+
+const scanRateLimiter = new SlidingWindowRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxRequests: 20,
+});
 
 // Lazily initialize Google GenAI client so env vars loaded at runtime are always picked up
 let aiClient: GoogleGenAI | null = null;
@@ -38,7 +43,7 @@ export const config = {
   maxDuration: 60,
   api: {
     bodyParser: {
-      sizeLimit: '20mb',
+      sizeLimit: '6mb',
     },
   },
 };
@@ -48,16 +53,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
+  const ip = getClientIp(req);
+  const limit = scanRateLimiter.check(ip);
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds));
+    return res.status(429).json({
+      error: 'Too many menu scans in a short time. Please wait a moment and try again.',
+    });
+  }
+
   try {
-    const { imageBase64, textInput } = req.body || {};
+    const rawBody = req.body && typeof req.body === 'object' ? req.body : {};
+    const imageBase64 = typeof rawBody.imageBase64 === 'string' ? rawBody.imageBase64 : '';
+    const textInput = typeof rawBody.textInput === 'string' ? rawBody.textInput : '';
 
     if (!imageBase64 && !textInput) {
       return res.status(400).json({ error: 'Please provide an image, PDF, or menu text.' });
     }
 
+    if (imageBase64.length > MAX_BASE64_LENGTH) {
+      return res.status(413).json({
+        error: 'The uploaded file is too large. Please use a smaller image or PDF (max 3 MB).',
+      });
+    }
+
+    if (textInput.length > MAX_TEXT_LENGTH) {
+      return res.status(413).json({
+        error: 'The pasted menu text is too long. Please trim it and try again.',
+      });
+    }
+
     let normalizedMime: AllowedScanMimeType = 'image/jpeg';
     if (imageBase64) {
-      const rawMime = req.body?.mimeType === undefined ? 'image/jpeg' : req.body.mimeType;
+      const rawMime = rawBody.mimeType === undefined ? 'image/jpeg' : rawBody.mimeType;
       const validated = normalizeScanMimeType(rawMime);
       if (!validated) {
         return res.status(400).json({
@@ -68,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const isPdf = normalizedMime === 'application/pdf';
-    const userSpecifiedBar = (req.body?.barName || '').trim();
+    const userSpecifiedBar = typeof rawBody.barName === 'string' ? rawBody.barName.trim() : '';
     const scanStartTime = Date.now();
 
     // Fast path: if only textInput is provided (no image), parse locally in <2ms!
@@ -135,17 +163,28 @@ Westmalle Tripel|b|330|9.5|5.80`;
 
     const formattedContents = contents.length === 1 ? contents[0] : { parts: contents };
 
-    // Helper to invoke a single model and parse its vision output
-    const runSingleModel = async (modelName: string) => {
+    type ModelScanResult = {
+      modelName: string;
+      elapsedMs: number;
+      drinks: any[];
+      detectedBarName: string;
+    };
+
+    // Helper to invoke a single model with AbortSignal support and parse its vision output
+    const runSingleModel = async (
+      modelName: string,
+      signal: AbortSignal
+    ): Promise<ModelScanResult> => {
       const modelStart = Date.now();
       const isLiteModel = modelName.includes('lite');
       const response = await client.models.generateContent({
         model: modelName,
         contents: formattedContents,
         config: isLiteModel
-          ? { temperature: 0 }
+          ? { temperature: 0, abortSignal: signal }
           : {
               temperature: 0,
+              abortSignal: signal,
               thinkingConfig: {
                 thinkingBudget: 0,
               },
@@ -161,96 +200,118 @@ Westmalle Tripel|b|330|9.5|5.80`;
       };
     };
 
-    // Smart parallel race across a wave of models:
-    // - Resolves immediately (0ms wait) when any model returns a full menu (>= 30 drinks)
-    // - If a model returns 1..29 drinks, waits at most 450ms in case a parallel sibling returns a fuller list
-    // - Never blocks on a single model hanging with 503 High Demand or 429 Quota
-    const raceModelWave = (models: string[], waveTimeoutMs = 14000): Promise<{
-      modelName: string;
-      elapsedMs: number;
-      drinks: any[];
-      detectedBarName: string;
-    } | null> => {
+    /**
+     * Cost-efficient hedged request strategy:
+     * - Starts 1 fast primary model immediately (1 API call on the happy path instead of 3-6).
+     * - Only launches the hedge model if the primary fails, returns 0 drinks, or exceeds hedgeDelayMs.
+     * - Aborts any losing in-flight request via AbortController as soon as a winner returns drinks.
+     */
+    const runHedgedPair = (
+      primaryModel: string,
+      hedgeModel: string,
+      hedgeDelayMs: number,
+      overallTimeoutMs: number
+    ): Promise<ModelScanResult | null> => {
       return new Promise((resolve) => {
         let settled = false;
-        let pending = models.length;
-        let bestResult: {
-          modelName: string;
-          elapsedMs: number;
-          drinks: any[];
-          detectedBarName: string;
-        } | null = null;
-        let graceTimer: ReturnType<typeof setTimeout> | null = null;
+        let hedgeStarted = false;
+        let inFlight = 0;
+        const controllers: AbortController[] = [];
+        let hedgeTimer: ReturnType<typeof setTimeout> | null = null;
 
-        const finish = (
-          winner: {
-            modelName: string;
-            elapsedMs: number;
-            drinks: any[];
-            detectedBarName: string;
-          } | null
-        ) => {
+        const finish = (winner: ModelScanResult | null) => {
           if (settled) return;
           settled = true;
-          if (graceTimer) clearTimeout(graceTimer);
+          if (hedgeTimer) clearTimeout(hedgeTimer);
           clearTimeout(overallTimer);
+          for (const c of controllers) {
+            if (!c.signal.aborted) c.abort();
+          }
           resolve(winner);
         };
 
-        const overallTimer = setTimeout(() => {
-          finish(bestResult);
-        }, waveTimeoutMs);
+        const launch = (modelName: string, onEmptyOrError?: () => void) => {
+          if (settled) return;
+          const controller = new AbortController();
+          controllers.push(controller);
+          inFlight++;
 
-        for (const modelName of models) {
-          runSingleModel(modelName)
+          runSingleModel(modelName, controller.signal)
             .then((result) => {
               if (settled) return;
               if (result.drinks.length > 0) {
-                console.log(
-                  `[scan-menu] ${result.modelName} returned ${result.drinks.length} drinks in ${result.elapsedMs}ms`
-                );
-                if (!bestResult || result.drinks.length > bestResult.drinks.length) {
-                  bestResult = result;
-                }
-                if (result.drinks.length >= 30) {
-                  finish(bestResult);
-                  return;
-                }
-                if (!graceTimer) {
-                  graceTimer = setTimeout(() => {
-                    finish(bestResult);
-                  }, 450);
-                }
+                finish(result);
+              } else {
+                onEmptyOrError?.();
               }
             })
             .catch((err: any) => {
-              console.warn(
-                `[scan-menu] ${modelName} error (${err.message?.slice(0, 80)})`
-              );
+              if (!settled && !controller.signal.aborted) {
+                console.warn(
+                  `[scan-menu] ${modelName} error (${err?.message?.slice(0, 80) || 'unknown'})`
+                );
+                onEmptyOrError?.();
+              }
             })
             .finally(() => {
-              pending--;
-              if (pending <= 0 && !settled) {
-                finish(bestResult);
+              inFlight--;
+              if (!settled && hedgeStarted && inFlight <= 0) {
+                finish(null);
               }
             });
-        }
+        };
+
+        const startHedge = () => {
+          if (settled || hedgeStarted) return;
+          hedgeStarted = true;
+          if (hedgeTimer) {
+            clearTimeout(hedgeTimer);
+            hedgeTimer = null;
+          }
+          launch(hedgeModel);
+        };
+
+        const overallTimer = setTimeout(() => {
+          finish(null);
+        }, overallTimeoutMs);
+
+        hedgeTimer = setTimeout(startHedge, hedgeDelayMs);
+        launch(primaryModel, startHedge);
       });
     };
 
-    // Wave 1: Parallel race of the fastest Flash-Lite and Flash models
-    let winningResult = await raceModelWave(
-      ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.5-flash'],
-      isPdf ? 25000 : 12000
+    // Primary: fast Flash-Lite, hedged with Flash only if slow or failing
+    let winningResult = await runHedgedPair(
+      'gemini-flash-lite-latest',
+      'gemini-flash-latest',
+      isPdf ? 9000 : 4500,
+      isPdf ? 28000 : 18000
     );
 
-    // Wave 2: Parallel fallback wave only if Wave 1 returned 0 drinks
+    // Final single fallback only if both primary and hedge returned 0 drinks
     if (!winningResult || winningResult.drinks.length === 0) {
-      console.log('[scan-menu] Wave 1 returned 0 drinks, launching Wave 2 fallback race...');
-      winningResult = await raceModelWave(
-        ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'],
-        isPdf ? 20000 : 15000
+      const fallbackController = new AbortController();
+      const fallbackTimer = setTimeout(
+        () => fallbackController.abort(),
+        isPdf ? 20000 : 14000
       );
+      try {
+        const resFallback = await runSingleModel(
+          'gemini-3.5-flash-lite',
+          fallbackController.signal
+        );
+        if (resFallback.drinks.length > 0) {
+          winningResult = resFallback;
+        }
+      } catch (err: any) {
+        if (!fallbackController.signal.aborted) {
+          console.warn(
+            `[scan-menu] fallback error (${err?.message?.slice(0, 80) || 'unknown'})`
+          );
+        }
+      } finally {
+        clearTimeout(fallbackTimer);
+      }
     }
 
     if (winningResult && winningResult.drinks.length > 0) {
@@ -278,15 +339,15 @@ Westmalle Tripel|b|330|9.5|5.80`;
     }
 
     // If no drinks found
-    return res.status(500).json({
+    return res.status(422).json({
       error:
         'Could not detect any alcoholic drinks from the menu image. Please ensure the menu photo is in focus or try entering text on the "Paste Menu Text" tab.',
-      details: 'No drinks recognized',
     });
   } catch (error: any) {
-    console.error('Error scanning menu:', error);
-    if (req.body?.textInput) {
-      const userSpecifiedBar = (req.body?.barName || '').trim();
+    console.error('[api/scan-menu] Error scanning menu:', error);
+    if (typeof req.body?.textInput === 'string' && req.body.textInput.trim()) {
+      const userSpecifiedBar =
+        typeof req.body?.barName === 'string' ? req.body.barName.trim() : '';
       const fallback = parseMenuFallback(req.body.textInput, userSpecifiedBar);
       return res.status(200).json({
         detectedBarName: fallback.detectedBarName,
@@ -296,258 +357,6 @@ Westmalle Tripel|b|330|9.5|5.80`;
     }
     return res.status(500).json({
       error: 'Failed to analyze menu image. Please verify the image is clear or try entering text.',
-      details: error.message,
     });
   }
-}
-
-// Robust dual-format parser: handles JSON or line-by-line pipe/bullet output from Vision models
-function parseVisionResponse(rawText: string, userSpecifiedBar?: string) {
-  const finalBar = userSpecifiedBar || 'Current Bar';
-
-  const postProcessItem = (rawItem: {
-    name: string;
-    barName: string;
-    category: string;
-    volumeMl: number;
-    abv: number;
-    price: number;
-    notes?: string;
-  }) => {
-    const snappedPrice = normalizeCafePrice(rawItem.price);
-    const sanitized = sanitizeDrinkItem({
-      name: rawItem.name,
-      barName: rawItem.barName,
-      category: rawItem.category as any,
-      volumeMl: rawItem.volumeMl,
-      abv: isExplicitZeroAlcohol(rawItem.name) ? 0 : rawItem.abv,
-      price: snappedPrice > 0 ? snappedPrice : rawItem.price,
-      notes: rawItem.notes,
-    });
-    return {
-      name: sanitized.name,
-      barName: sanitized.barName || finalBar,
-      category: sanitized.category,
-      volumeMl: sanitized.volumeMl,
-      abv: sanitized.abv,
-      price: sanitized.price,
-      notes: sanitized.notes || '',
-    };
-  };
-
-  // 1. Try JSON extraction first
-  try {
-    const jsonMatch =
-      rawText.match(/```json\s*([\s\S]*?)\s*```/i) ||
-      rawText.match(/```\s*([\s\S]*?)\s*```/i) ||
-      rawText.match(/(\{[\s\S]*\})/);
-
-    const jsonString = jsonMatch ? jsonMatch[1] : rawText;
-    const parsed = JSON.parse(jsonString);
-    const list = Array.isArray(parsed) ? parsed : parsed.drinks || parsed.items;
-
-    if (Array.isArray(list) && list.length > 0) {
-      const validDrinks = list
-        .filter((d) => d && (d.name || d.drinkName))
-        .map((d) => {
-          const rawName = (d.name || d.drinkName || 'Drink').trim();
-          const parsedAbv = Number(d.abv);
-          return postProcessItem({
-            name: rawName,
-            barName: userSpecifiedBar || d.barName || parsed.detectedBarName || finalBar,
-            category: (d.category || 'beer').toLowerCase(),
-            volumeMl: Number(d.volumeMl) || 330,
-            abv: isExplicitZeroAlcohol(rawName)
-              ? 0
-              : Number.isFinite(parsedAbv) && parsedAbv >= 0
-                ? parsedAbv
-                : 5.0,
-            price: Number(d.price) || 4.5,
-            notes: d.notes || '',
-          });
-        })
-        .filter((d) => d.price > 0 && d.volumeMl > 0);
-
-      if (validDrinks.length > 0) {
-        return {
-          detectedBarName: userSpecifiedBar || parsed.detectedBarName || finalBar,
-          drinks: validDrinks,
-        };
-      }
-    }
-  } catch (e) {
-    // Continue to line parsing
-  }
-
-  // 2. Line-by-line parsing (for compact pipe-delimited or list outputs)
-  const lines = rawText.split('\n').map((l) => l.trim()).filter(Boolean);
-  const items: any[] = [];
-  let detectedBarFromHeader = finalBar;
-
-  for (const line of lines) {
-    if (
-      line.startsWith('#') ||
-      line.startsWith('---') ||
-      line.startsWith('===') ||
-      line.startsWith('```') ||
-      line.toLowerCase().includes('failed to analyze') ||
-      line.toLowerCase().includes('geschiedenis van')
-    ) {
-      continue;
-    }
-
-    if (line.includes('|')) {
-      const parts = line.split('|').map((p) => p.trim());
-      if (parts.length >= 2) {
-        const rawFirst = parts[0].replace(/^[*•-]\s*/, '').replace(/[*_]/g, '').trim();
-
-        // Check for optional BAR|Venue Name header line
-        if (rawFirst.toUpperCase() === 'BAR' && parts[1]) {
-          if (!userSpecifiedBar) {
-            detectedBarFromHeader = parts[1].trim() || finalBar;
-          }
-          continue;
-        }
-
-        const name = rawFirst;
-        if (
-          !name ||
-          name.toLowerCase() === 'name' ||
-          name.toLowerCase() === 'drink name' ||
-          name.toLowerCase().includes('tapbieren wisseltaps')
-        ) {
-          continue;
-        }
-
-        let category = 'beer';
-        if (parts[1]) {
-          const c = parts[1].toLowerCase().trim();
-          if (c === 'w' || c.includes('wine') || c.includes('wijn')) category = 'wine';
-          else if (c === 'ci' || c.includes('cider')) category = 'cider';
-          else if (c === 's' || c.includes('spirit') || c.includes('shot') || c.includes('sterk')) category = 'spirit';
-          else if (c === 'c' || c.includes('cocktail')) category = 'cocktail';
-          else if (c === 'o' || c.includes('other')) category = 'other';
-          else category = 'beer';
-        }
-
-        let volumeMl = 330;
-        let abv = isExplicitZeroAlcohol(name) ? 0 : 5.0;
-        let price = 0;
-        let notes = '';
-
-        // Fast positional parsing for compact format: Name|Cat|VolumeMl|ABV|Price(|Notes)
-        if (parts.length >= 5) {
-          const vRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(vRaw) && vRaw > 0) {
-            volumeMl = /\bcl\b/i.test(parts[2]) && vRaw < 100 ? Math.round(vRaw * 10) : Math.round(vRaw);
-          }
-          const aRaw = parseFloat(parts[3].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(aRaw) && aRaw >= 0 && aRaw <= 100) {
-            abv = aRaw;
-          }
-          const pRaw = parseFloat(parts[4].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(pRaw) && pRaw > 0) {
-            price = pRaw;
-          }
-          if (parts[5]) {
-            notes = parts[5].trim();
-          }
-        } else if (parts.length === 4) {
-          // 4 columns: either Name|Cat|ABV|Price or Name|VolumeMl|ABV|Price
-          const secondAsNum = parseFloat(parts[1].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(secondAsNum) && secondAsNum >= 20) {
-            category = 'beer';
-            volumeMl = /\bcl\b/i.test(parts[1]) && secondAsNum < 100 ? Math.round(secondAsNum * 10) : Math.round(secondAsNum);
-          }
-          const aRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(aRaw) && aRaw >= 0 && aRaw <= 100) abv = aRaw;
-          const pRaw = parseFloat(parts[3].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(pRaw) && pRaw > 0) price = pRaw;
-        } else if (parts.length === 3) {
-          // 3 columns: Name|ABV|Price
-          category = 'beer';
-          const aRaw = parseFloat(parts[1].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(aRaw) && aRaw >= 0 && aRaw <= 100) abv = aRaw;
-          const pRaw = parseFloat(parts[2].replace(',', '.').replace(/[^\d.]/g, ''));
-          if (Number.isFinite(pRaw) && pRaw > 0) price = pRaw;
-        } else {
-          // Fallback column scanning when fewer than 5 columns
-          notes = parts.length > 5 ? parts[parts.length - 1] : '';
-          for (let i = 2; i < parts.length; i++) {
-            const part = parts[i];
-            if (/ml\b/i.test(part) || (/^\d{2,4}$/.test(part) && parseInt(part, 10) >= 100)) {
-              const v = parseFloat(part.replace(/[^\d.]/g, ''));
-              if (v > 0) volumeMl = v;
-            } else if (/%/.test(part)) {
-              const a = parseFloat(part.replace(',', '.').replace(/[^\d.]/g, ''));
-              if (a >= 0 && a <= 100) abv = a;
-            } else if (/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})/.test(part)) {
-              const m = part.match(/(\d+[.,]\d{1,2})/);
-              if (m) price = parseFloat(m[1].replace(',', '.'));
-            }
-          }
-        }
-
-        if (!price) {
-          const pm = line.match(/(?:€|\$|£)?\s*(\d+[.,]\d{1,2})\s*$/);
-          if (pm) price = parseFloat(pm[1].replace(',', '.'));
-        }
-
-        if (name && price > 0) {
-          items.push(
-            postProcessItem({
-              name,
-              barName: detectedBarFromHeader,
-              category,
-              volumeMl,
-              abv,
-              price,
-              notes,
-            })
-          );
-          continue;
-        }
-      }
-    }
-
-    // Heuristic line parsing fallback
-    const priceMatch =
-      line.match(/(?:€|\$|£)?\s*(\d+[.,]\d{2})\b/) || line.match(/\(\s*(\d+[.,]\d{1,2})\s*\)/);
-    if (priceMatch) {
-      const price = parseFloat(priceMatch[1].replace(',', '.'));
-      const abvMatch = line.match(/(\d+(?:[.,]\d+)?)\s*%/);
-      const abv = isExplicitZeroAlcohol(line)
-        ? 0
-        : abvMatch
-          ? parseFloat(abvMatch[1].replace(',', '.'))
-          : 5.0;
-
-      const name = line
-        .replace(/[*_#•-]/g, ' ')
-        .replace(priceMatch[0], '')
-        .replace(/\(\s*\d+(?:[.,]\d+)?\s*%\s*\)/g, '')
-        .replace(/[-–—|()]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      if (name && name.length >= 2 && price > 0 && price < 100) {
-        items.push(
-          postProcessItem({
-            name,
-            barName: detectedBarFromHeader,
-            category: 'beer',
-            volumeMl: 330,
-            abv,
-            price,
-            notes: '',
-          })
-        );
-      }
-    }
-  }
-
-  return {
-    detectedBarName: detectedBarFromHeader,
-    drinks: items,
-  };
 }

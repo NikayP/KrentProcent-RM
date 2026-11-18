@@ -1,4 +1,4 @@
-import { DrinkItem } from '../utils/calculator';
+import type { DrinkItem } from '../utils/calculator';
 
 export const POPULAR_BAR_PRESETS: DrinkItem[] = [
   {

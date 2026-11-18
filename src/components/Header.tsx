@@ -20,7 +20,7 @@ import {
   Download,
   WifiOff,
 } from 'lucide-react';
-import { DrinkItem, filterDrinksByBar, normalizeBarKey } from '../utils/calculator';
+import { DEFAULT_BAR_NAME, DrinkItem, filterDrinksByBar, normalizeBarKey } from '../utils/calculator';
 import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
@@ -229,11 +229,16 @@ export const Header: React.FC<HeaderProps> = ({
     };
   }, [isPickerOpen, isAddingBar, isRenamingBar]);
 
-  // Precompute drink count per bar in a single pass
+  // Precompute drink count per bar in a single O(D) pass
   const barCounts = useMemo(() => {
+    const byKey = new Map<string, number>();
+    for (const d of drinks) {
+      const key = normalizeBarKey(d.barName || DEFAULT_BAR_NAME);
+      byKey.set(key, (byKey.get(key) || 0) + 1);
+    }
     const counts = new Map<string, number>();
     for (const bar of availableBars) {
-      counts.set(bar, filterDrinksByBar(drinks, bar).length);
+      counts.set(bar, byKey.get(normalizeBarKey(bar)) || 0);
     }
     return counts;
   }, [drinks, availableBars]);
@@ -413,6 +418,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {(drinkCount > 0 || availableBars.length > 0) && (
               <button
+                type="button"
                 onClick={onReset}
                 title="Reset all drinks and bars"
                 className="p-1.5 sm:p-2 text-zinc-500 dark:text-zinc-400 hover:text-[#F21B2D] dark:hover:text-[#FF8A8E] bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 dark:hover:bg-[#27272A] rounded-xl transition-colors border border-[#E4E4E7] dark:border-[#27272A]"
@@ -426,9 +432,14 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Navigation Tabs Row (Desktop & Tablet — Mobile uses BottomTabBar) */}
         <div className="hidden sm:block">
-          <nav className="grid grid-cols-3 gap-1.5 bg-[#FFF2F3] dark:bg-[#121214] p-1 rounded-2xl border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold">
+          <nav
+            aria-label="Primary navigation"
+            className="grid grid-cols-3 gap-1.5 bg-[#FFF2F3] dark:bg-[#121214] p-1 rounded-2xl border border-[#E4E4E7] dark:border-[#27272A] text-xs font-semibold"
+          >
             {/* 1. Left: Drinks Calculator */}
             <button
+              type="button"
+              aria-current={activeTab === 'calculator' ? 'page' : undefined}
               onClick={() => setActiveTab('calculator')}
               className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'calculator'
@@ -443,6 +454,8 @@ export const Header: React.FC<HeaderProps> = ({
             {/* 2. Center: Menu Scanner (Hero Feature) */}
             <button
               id="tour-nav-scanner"
+              type="button"
+              aria-current={activeTab === 'scanner' ? 'page' : undefined}
               onClick={() => setActiveTab('scanner')}
               className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'scanner'
@@ -456,6 +469,8 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* 3. Right: Bar Hub */}
             <button
+              type="button"
+              aria-current={activeTab === 'bars' ? 'page' : undefined}
               onClick={() => setActiveTab('bars')}
               className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl transition-all whitespace-nowrap min-w-0 ${
                 activeTab === 'bars'
@@ -528,7 +543,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Dropdown Menu */}
               {isPickerOpen && (
-                <div className="absolute left-0 mt-1.5 w-72 sm:w-80 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute left-0 mt-1.5 w-72 sm:w-80 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl shadow-xl z-50 overflow-hidden animate-kp-popover">
                   {/* Search / Quick Add Input */}
                   <div className="p-2 border-b border-[#E4E4E7] dark:border-[#27272A] bg-[#FFF2F3]/60 dark:bg-[#121214]">
                     <div className="relative flex items-center">
@@ -567,11 +582,17 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
 
                   {/* Bar List */}
-                  <div className="max-h-60 overflow-y-auto divide-y divide-[#E4E4E7]/60 dark:divide-[#27272A]/60">
+                  <div
+                    role="listbox"
+                    aria-label="Select active bar"
+                    className="max-h-60 overflow-y-auto divide-y divide-[#E4E4E7]/60 dark:divide-[#27272A]/60"
+                  >
                     {/* All Bars Global Option */}
                     {!barSearchQuery.trim() && (
                       <button
                         type="button"
+                        role="option"
+                        aria-selected={activeBar === 'all'}
                         onClick={() => {
                           onSelectBar('all');
                           setIsPickerOpen(false);
@@ -601,6 +622,8 @@ export const Header: React.FC<HeaderProps> = ({
                         <button
                           key={bar}
                           type="button"
+                          role="option"
+                          aria-selected={isSelected}
                           onClick={() => {
                             onSelectBar(bar);
                             setIsPickerOpen(false);

@@ -1185,49 +1185,62 @@ export function mergeDrinksBatch(
     };
   }
 
-  let currentList = [...existingDrinks];
+  const workingList = [...existingDrinks];
+  const variantToIndex = new Map<string, number>();
+  for (let i = 0; i < workingList.length; i++) {
+    const key = getBarDrinkVariantKey(workingList[i]);
+    if (!variantToIndex.has(key)) {
+      variantToIndex.set(key, i);
+    }
+  }
+
   const newlyAdded: DrinkItem[] = [];
   let addedCount = 0;
   let updatedCount = 0;
   let skippedCount = batchInternalDups;
 
   for (const candidate of uniqueIncoming) {
-    const dup = findDuplicateDrinkInBar(currentList, candidate);
+    const key = getBarDrinkVariantKey(candidate);
+    const existingIdx = variantToIndex.get(key);
 
-    if (!dup || dup.matchType === 'same_name_diff_volume') {
+    if (existingIdx === undefined) {
       newlyAdded.push(candidate);
-      currentList = [candidate, ...currentList];
+      variantToIndex.set(key, -1);
       addedCount++;
-    } else if (dup.matchType === 'exact') {
+      continue;
+    }
+
+    if (existingIdx < 0) {
       skippedCount++;
-    } else if (dup.matchType === 'same_variant') {
-      if (conflictStrategy === 'skip') {
-        skippedCount++;
-      } else {
-        // 'update'
-        const existingId = dup.existingDrink.id;
-        currentList = currentList.map((d) =>
-          d.id === existingId
-            ? {
-                ...d,
-                name: candidate.name || d.name,
-                category: candidate.category,
-                volumeMl: candidate.volumeMl,
-                abv: candidate.abv,
-                price: candidate.price,
-                notes: candidate.notes || d.notes,
-              }
-            : d
-        );
-        updatedCount++;
-      }
+      continue;
+    }
+
+    const existing = workingList[existingIdx];
+    const isSameAbv = Math.abs((Number(existing.abv) || 0) - (Number(candidate.abv) || 0)) < 0.01;
+    const isSamePrice =
+      Math.abs((Number(existing.price) || 0) - (Number(candidate.price) || 0)) < 0.005;
+
+    if (isSameAbv && isSamePrice) {
+      skippedCount++;
+    } else if (conflictStrategy === 'skip') {
+      skippedCount++;
+    } else {
+      workingList[existingIdx] = {
+        ...existing,
+        name: candidate.name || existing.name,
+        category: candidate.category,
+        volumeMl: candidate.volumeMl,
+        abv: candidate.abv,
+        price: candidate.price,
+        notes: candidate.notes || existing.notes,
+      };
+      updatedCount++;
     }
   }
 
   // Put newly added items at the top of the list
-  const existingUpdated = currentList.filter((d) => !newlyAdded.some((n) => n.id === d.id));
   return {
-    drinks: consolidateDrinksBars([...newlyAdded, ...existingUpdated]),
+    drinks: consolidateDrinksBars([...newlyAdded, ...workingList]),
     addedCount,
     updatedCount,
     skippedCount,
@@ -1382,10 +1395,21 @@ export function calculateBarSummaries(
   extraBars: string[] = []
 ): BarSummary[] {
   const bars = getUniqueBars(drinks, extraBars);
+  const drinksByBarKey = new Map<string, DrinkItem[]>();
+
+  for (const d of drinks) {
+    const key = normalizeBarKey(d.barName || DEFAULT_BAR_NAME);
+    let bucket = drinksByBarKey.get(key);
+    if (!bucket) {
+      bucket = [];
+      drinksByBarKey.set(key, bucket);
+    }
+    bucket.push(d);
+  }
 
   return bars
     .map((barName) => {
-      const barDrinks = filterDrinksByBar(drinks, barName);
+      const barDrinks = drinksByBarKey.get(normalizeBarKey(barName)) || [];
       const ranked = rankDrinks(barDrinks);
 
       if (ranked.length === 0) {
@@ -1400,9 +1424,16 @@ export function calculateBarSummaries(
         };
       }
 
-      const totalKrent = ranked.reduce((acc, d) => acc + d.pureAlcoholPerCurrency, 0);
-      const totalPricePerLiter = ranked.reduce((acc, d) => acc + d.pricePerLiter, 0);
-      const sortedByPrice = [...ranked].sort((a, b) => a.price - b.price);
+      let totalKrent = 0;
+      let totalPricePerLiter = 0;
+      let cheapestDrink = ranked[0];
+      for (const d of ranked) {
+        totalKrent += d.pureAlcoholPerCurrency;
+        totalPricePerLiter += d.pricePerLiter;
+        if (d.price < cheapestDrink.price) {
+          cheapestDrink = d;
+        }
+      }
 
       return {
         barName,
@@ -1411,7 +1442,7 @@ export function calculateBarSummaries(
         worstDrink: ranked[ranked.length - 1],
         averageKrentScore: Number((totalKrent / ranked.length).toFixed(3)),
         averagePricePerLiter: Number((totalPricePerLiter / ranked.length).toFixed(2)),
-        cheapestDrink: sortedByPrice[0],
+        cheapestDrink,
       };
     })
     .sort((a, b) => {

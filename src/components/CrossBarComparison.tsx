@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   DrinkItem,
   calculateBarSummaries,
@@ -61,9 +61,15 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
   const [pendingPublicBar, setPendingPublicBar] = useState<string | null>(null);
   const [cityDrafts, setCityDrafts] = useState<Record<string, string>>({});
 
-  const summaries = calculateBarSummaries(drinks, extraBars);
-  const commonDrinks = findCrossBarCommonDrinks(drinks);
-  const populatedSummaries = summaries.filter((s) => s.drinkCount > 0);
+  const summaries = useMemo(
+    () => calculateBarSummaries(drinks, extraBars),
+    [drinks, extraBars]
+  );
+  const commonDrinks = useMemo(() => findCrossBarCommonDrinks(drinks), [drinks]);
+  const populatedSummaries = useMemo(
+    () => summaries.filter((s) => s.drinkCount > 0),
+    [summaries]
+  );
 
   const handleAddBarSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,6 +205,7 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => onSelectBar(highestValueBar.barName)}
                 className="px-3 py-1.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold text-xs flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
               >
@@ -272,11 +279,15 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                     onSubmit={(e) => handleRenameSubmit(e, summary.barName)}
                     className="space-y-1.5 my-2"
                   >
-                    <label className="block text-[10px] text-[#F21B2D] uppercase font-bold">
+                    <label
+                      htmlFor={`rename-bar-${barKey}`}
+                      className="block text-[10px] text-[#F21B2D] uppercase font-bold"
+                    >
                       Rename Bar (or type existing bar name to merge):
                     </label>
                     <div className="flex items-center gap-1.5">
                       <input
+                        id={`rename-bar-${barKey}`}
                         type="text"
                         value={renameValue}
                         onChange={(e) => setRenameValue(e.target.value)}
@@ -414,12 +425,12 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                 </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 mt-4">
+              {/* Action Button */}
+              <div className="mt-4">
                 <button
                   type="button"
                   onClick={() => onSelectBar(summary.barName)}
-                  className="flex-1 py-2.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#F21B2D] hover:text-white text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#F21B2D] hover:text-white text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
                 >
                   <span>
                     {summary.drinkCount > 0
@@ -427,16 +438,6 @@ export const CrossBarComparison: React.FC<CrossBarComparisonProps> = ({
                       : `Add Drinks to ${summary.barName}`}
                   </span>
                   <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onDeleteBar(summary.barName)}
-                  title={`Delete ${summary.barName}`}
-                  className="p-2.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#F21B2D] text-zinc-500 dark:text-zinc-400 hover:text-white border border-[#E4E4E7] dark:border-[#27272A] hover:border-[#F21B2D] transition-colors"
-                  aria-label={`Remove bar ${summary.barName}`}
-                >
-                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>

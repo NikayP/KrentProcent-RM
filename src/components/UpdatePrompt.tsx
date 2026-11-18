@@ -1,23 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 export const UpdatePrompt: React.FC = () => {
+  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisteredSW(_swUrl, registration) {
-      if (!registration) return;
-      // Check for app updates when returning to the app
-      const checkUpdate = () => {
-        if (document.visibilityState === 'visible') {
-          void registration.update();
-        }
-      };
-      document.addEventListener('visibilitychange', checkUpdate);
+    onRegisteredSW(_swUrl, reg) {
+      if (reg) setRegistration(reg);
     },
   });
+
+  useEffect(() => {
+    if (!registration) return;
+    // Check for app updates when returning to the app
+    const checkUpdate = () => {
+      if (document.visibilityState === 'visible') {
+        void registration.update();
+      }
+    };
+    document.addEventListener('visibilitychange', checkUpdate);
+    return () => {
+      document.removeEventListener('visibilitychange', checkUpdate);
+    };
+  }, [registration]);
 
   if (!needRefresh) return null;
 

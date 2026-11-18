@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Beer,
   Sparkles,
@@ -10,6 +10,7 @@ import {
   Coins,
   UserCheck,
 } from 'lucide-react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface QuickTourProps {
   isOpen: boolean;
@@ -96,6 +97,8 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, isOpen);
 
   // Always reset to step 0 when reopened
   useEffect(() => {
@@ -123,10 +126,15 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
     }
   }, [currentStep]);
 
-  // Keyboard navigation (Left / Right arrows)
+  // Keyboard navigation (Escape, Left / Right arrows)
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.key === 'ArrowRight') {
@@ -139,7 +147,7 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, handleNext, handlePrev]);
+  }, [isOpen, handleNext, handlePrev, onClose]);
 
   // Sync tab, wait for lazy-loaded targets, scroll once cleanly, and track layout shifts
   useEffect(() => {
@@ -175,14 +183,19 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
         hasScrolledForStep = true;
         const headerEl = document.querySelector('header');
         const isHeaderChild = headerEl ? headerEl.contains(el) : false;
+        const scrollBehavior: ScrollBehavior = window.matchMedia?.(
+          '(prefers-reduced-motion: reduce)'
+        ).matches
+          ? 'auto'
+          : 'smooth';
         if (isHeaderChild) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          window.scrollTo({ top: 0, behavior: scrollBehavior });
         } else {
           const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 96;
           const elTop = rect.top + window.scrollY;
           window.scrollTo({
             top: Math.max(0, elTop - headerHeight - 16),
-            behavior: 'smooth',
+            behavior: scrollBehavior,
           });
         }
       }
@@ -283,10 +296,12 @@ export const QuickTourModal: React.FC<QuickTourProps> = ({
       {/* Floating Tour Card */}
       <div className={cardContainerClass}>
         <div
+          ref={dialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-labelledby="tour-step-title"
-          className="pointer-events-auto w-full max-w-md bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 sm:p-5 shadow-2xl relative text-[#18181B] dark:text-[#FFFFFF] space-y-3"
+          className="pointer-events-auto w-full max-w-md bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-4 sm:p-5 shadow-2xl relative text-[#18181B] dark:text-[#FFFFFF] space-y-3 focus:outline-none"
         >
           {/* Thin top progress bar across all steps */}
           <div className="grid grid-cols-5 gap-1 pr-7">

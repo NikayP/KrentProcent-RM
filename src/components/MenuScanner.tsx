@@ -38,8 +38,22 @@ import {
  * well below Vercel's 4.5 MB Serverless Function payload limit (typically ~200-500 KB)
  * while preserving high visual fidelity for Gemini Vision OCR.
  */
-// In-memory cache keyed by image/text fingerprint for 0ms repeat scans
+// Bounded LRU in-memory cache keyed by image/text fingerprint for 0ms repeat scans
+const MAX_SCAN_CACHE_ENTRIES = 10;
 const scanResultCache = new Map<string, { detectedBarName?: string; drinks: any[] }>();
+let cachedGeminiConfigured: boolean | null = null;
+
+function setScanCacheEntry(key: string, value: { detectedBarName?: string; drinks: any[] }): void {
+  if (scanResultCache.has(key)) {
+    scanResultCache.delete(key);
+  }
+  scanResultCache.set(key, value);
+  while (scanResultCache.size > MAX_SCAN_CACHE_ENTRIES) {
+    const oldestKey = scanResultCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    scanResultCache.delete(oldestKey);
+  }
+}
 
 function computeScanCacheKey(imageBase64?: string | null, textInput?: string): string {
   const imgPart = imageBase64
@@ -49,66 +63,121 @@ function computeScanCacheKey(imageBase64?: string | null, textInput?: string): s
   return `${imgPart}||${txtPart}`;
 }
 
-function compressImageFile(file: File, maxDimension = 1280, quality = 0.8): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Failed to read image file'));
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      const img = new Image();
-      img.onerror = () => reject(new Error('Failed to load image for compression'));
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        // Downscale while maintaining aspect ratio if either dimension exceeds maxDimension
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          // If canvas context fails, fall back to original dataUrl
-          resolve(dataUrl);
-          return;
-        }
-
-        // Subtle contrast boost sharpens small menu prices for fast Flash-Lite OCR
-        try {
-          ctx.filter = 'contrast(1.12)';
-        } catch {
-          // Ignore if browser canvas does not support filter
-        }
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Export as JPEG with optimal compression
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        resolve(compressedDataUrl);
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.onload = () => resolve(reader.result as string);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
+}
+
+function canvasToJpegDataUrl(canvas: HTMLCanvasElement, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (typeof canvas.toBlob === 'function') {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error('Failed to encode compressed JPEG'));
+            return;
+          }
+          void readBlobAsDataUrl(blob).then(resolve, reject);
+        },
+        'image/jpeg',
+        quality
+      );
+      return;
+    }
+    try {
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function loadDrawableImage(
+  file: File
+): Promise<{ source: CanvasImageSource; width: number; height: number; cleanup: () => void }> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        cleanup: () => bitmap.close(),
+      };
+    } catch {
+      // Fall back to ObjectURL + HTMLImageElement (e.g., certain mobile HEIC/EXIF edge cases)
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image for compression'));
+    };
+    img.onload = () => {
+      resolve({
+        source: img,
+        width: img.naturalWidth || img.width,
+        height: img.naturalHeight || img.height,
+        cleanup: () => URL.revokeObjectURL(objectUrl),
+      });
+    };
+    img.src = objectUrl;
+  });
+}
+
+async function compressImageFile(
+  file: File,
+  maxDimension = 1280,
+  quality = 0.8
+): Promise<string> {
+  const { source, width: origWidth, height: origHeight, cleanup } = await loadDrawableImage(file);
+  try {
+    let width = origWidth;
+    let height = origHeight;
+
+    // Downscale while maintaining aspect ratio if either dimension exceeds maxDimension
+    if (width > maxDimension || height > maxDimension) {
+      if (width > height) {
+        height = Math.round((height * maxDimension) / width);
+        width = maxDimension;
+      } else {
+        width = Math.round((width * maxDimension) / height);
+        height = maxDimension;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return readBlobAsDataUrl(file);
+    }
+
+    // Subtle contrast boost sharpens small menu prices for fast Flash-Lite OCR
+    try {
+      ctx.filter = 'contrast(1.12)';
+    } catch {
+      // Ignore if browser canvas does not support filter
+    }
+
+    ctx.drawImage(source, 0, 0, width, height);
+    return await canvasToJpegDataUrl(canvas, quality);
+  } finally {
+    cleanup();
+  }
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return readBlobAsDataUrl(file);
 }
 
 interface ScanUpload {
@@ -146,16 +215,41 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNote, setSuccessNote] = useState<string | null>(null);
   const [mode, setMode] = useState<'photo' | 'text'>('photo');
-  const [isGeminiConfigured, setIsGeminiConfigured] = useState<boolean>(true);
+  const [isGeminiConfigured, setIsGeminiConfigured] = useState<boolean>(
+    cachedGeminiConfigured ?? true
+  );
   const [preScanStatus, setPreScanStatus] = useState<'idle' | 'running' | 'ready'>('idle');
   const isOnline = useOnlineStatus();
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
-  const inFlightPreScanRef = useRef<{ key: string; promise: Promise<any> } | null>(null);
+  const inFlightPreScanRef = useRef<{
+    key: string;
+    promise: Promise<any>;
+    controller: AbortController;
+  } | null>(null);
+  const preScanDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Speculative background pre-scan: starts analyzing the menu file the instant it is selected
+  const cancelBackgroundPreScan = () => {
+    if (preScanDelayTimerRef.current) {
+      clearTimeout(preScanDelayTimerRef.current);
+      preScanDelayTimerRef.current = null;
+    }
+    if (inFlightPreScanRef.current) {
+      inFlightPreScanRef.current.controller.abort();
+      inFlightPreScanRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      cancelBackgroundPreScan();
+    };
+  }, []);
+
+  // Speculative background pre-scan: starts after a short 600ms grace delay and aborts cleanly on file change/unmount
   const startBackgroundPreScan = (targetUpload: ScanUpload) => {
+    cancelBackgroundPreScan();
     if (!isGeminiConfigured || !isOnline) return;
     if (estimateBase64Bytes(targetUpload.dataUrl) > MAX_PAYLOAD_BYTES) return;
     const cacheKey = computeScanCacheKey(targetUpload.dataUrl, '');
@@ -163,55 +257,62 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       setPreScanStatus('ready');
       return;
     }
-    if (inFlightPreScanRef.current?.key === cacheKey) {
-      return;
-    }
 
-    setPreScanStatus('running');
-    const preScanPromise = (async () => {
-      try {
-        const response = await fetch('/api/scan-menu', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: targetUpload.dataUrl,
-            mimeType: targetUpload.mimeType,
-          }),
-        });
-        if (!response.ok) {
-          setPreScanStatus('idle');
+    preScanDelayTimerRef.current = setTimeout(() => {
+      preScanDelayTimerRef.current = null;
+      const controller = new AbortController();
+      setPreScanStatus('running');
+
+      const preScanPromise = (async () => {
+        try {
+          const response = await fetch('/api/scan-menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              imageBase64: targetUpload.dataUrl,
+              mimeType: targetUpload.mimeType,
+            }),
+          });
+          if (!response.ok) {
+            if (!controller.signal.aborted) setPreScanStatus('idle');
+            return null;
+          }
+          const data = await response.json();
+          if (data?.drinks && Array.isArray(data.drinks) && data.drinks.length > 0) {
+            setScanCacheEntry(cacheKey, data);
+            if (!controller.signal.aborted) setPreScanStatus('ready');
+            return data;
+          }
+          if (!controller.signal.aborted) setPreScanStatus('idle');
           return null;
+        } catch {
+          if (!controller.signal.aborted) setPreScanStatus('idle');
+          return null;
+        } finally {
+          if (inFlightPreScanRef.current?.key === cacheKey) {
+            inFlightPreScanRef.current = null;
+          }
         }
-        const data = await response.json();
-        if (data?.drinks && Array.isArray(data.drinks) && data.drinks.length > 0) {
-          scanResultCache.set(cacheKey, data);
-          setPreScanStatus('ready');
-          return data;
-        }
-        setPreScanStatus('idle');
-        return null;
-      } catch {
-        setPreScanStatus('idle');
-        return null;
-      } finally {
-        if (inFlightPreScanRef.current?.key === cacheKey) {
-          inFlightPreScanRef.current = null;
-        }
-      }
-    })();
+      })();
 
-    inFlightPreScanRef.current = { key: cacheKey, promise: preScanPromise };
+      inFlightPreScanRef.current = { key: cacheKey, promise: preScanPromise, controller };
+    }, 600);
   };
 
   useEffect(() => {
-    fetch('/api/config')
+    if (cachedGeminiConfigured !== null) return;
+    const controller = new AbortController();
+    fetch('/api/config', { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg) => {
         if (cfg && typeof cfg.geminiConfigured === 'boolean') {
+          cachedGeminiConfigured = cfg.geminiConfigured;
           setIsGeminiConfigured(cfg.geminiConfigured);
         }
       })
       .catch(() => {});
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -221,6 +322,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
   }, [activeBar]);
 
   const clearSelectedFile = () => {
+    cancelBackgroundPreScan();
     setUpload(null);
     setPreScanStatus('idle');
     if (cameraInputRef.current) cameraInputRef.current.value = '';
@@ -278,7 +380,15 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
       }
 
       setUpload(nextUpload);
-      startBackgroundPreScan(nextUpload);
+      if (estimateBase64Bytes(nextUpload.dataUrl) > MAX_PAYLOAD_BYTES) {
+        setErrorMessage(
+          nextUpload.kind === 'pdf'
+            ? 'PDF is larger than 3 MB — screenshot the drinks page or use a smaller PDF.'
+            : 'The image is too large for the scanning service (> 4.2 MB). Please take a closer photo or crop the image.'
+        );
+      } else {
+        startBackgroundPreScan(nextUpload);
+      }
     } catch {
       setErrorMessage('Could not read the selected file. Please try again.');
       e.target.value = '';
@@ -319,6 +429,11 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         (!textToSend.trim() && upload ? scanResultCache.get(fileOnlyKey) : undefined);
       let data: any = null;
       let joinedPreScan = false;
+
+      if (preScanDelayTimerRef.current) {
+        clearTimeout(preScanDelayTimerRef.current);
+        preScanDelayTimerRef.current = null;
+      }
 
       if (cached) {
         data = cached;
@@ -386,7 +501,7 @@ export const MenuScanner: React.FC<MenuScannerProps> = ({
         }
 
         if (data?.drinks && Array.isArray(data.drinks) && data.drinks.length > 0) {
-          scanResultCache.set(cacheKey, data);
+          setScanCacheEntry(cacheKey, data);
         }
       }
 

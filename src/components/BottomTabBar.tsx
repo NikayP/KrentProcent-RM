@@ -23,7 +23,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           role="tab"
           aria-selected={activeTab === 'calculator'}
           onClick={() => onSelectTab('calculator')}
-          className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
+          className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F21B2D] rounded-xl"
         >
           <span
             className={`flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
@@ -51,7 +51,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           role="tab"
           aria-selected={activeTab === 'scanner'}
           onClick={() => onSelectTab('scanner')}
-          className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
+          className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F21B2D] rounded-xl"
         >
           <span
             className={`flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${
@@ -79,7 +79,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           role="tab"
           aria-selected={activeTab === 'bars'}
           onClick={() => onSelectTab('bars')}
-          className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus:outline-none"
+          className="group flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-transform duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#F21B2D] rounded-xl"
         >
           <span
             className={`relative flex items-center justify-center w-14 h-7 rounded-full transition-colors duration-150 ${

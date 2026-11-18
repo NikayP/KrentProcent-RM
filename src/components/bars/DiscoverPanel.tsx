@@ -14,6 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import {
+  type CalculatedDrink,
   type DrinkItem,
   areBarNamesEquivalent,
   formatCurrency,
@@ -54,7 +55,9 @@ export const DiscoverPanel: React.FC<DiscoverPanelProps> = ({
   const [reloadNonce, setReloadNonce] = useState(0);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [drinksCache, setDrinksCache] = useState<Record<string, DrinkItem[]>>({});
+  const [drinksCache, setDrinksCache] = useState<
+    Record<string, { drinks: DrinkItem[]; topDrinks: CalculatedDrink[] }>
+  >({});
   const [loadingDrinksId, setLoadingDrinksId] = useState<string | null>(null);
   const [adoptingId, setAdoptingId] = useState<string | null>(null);
   const [drinksErrorId, setDrinksErrorId] = useState<string | null>(null);
@@ -110,13 +113,14 @@ export const DiscoverPanel: React.FC<DiscoverPanelProps> = ({
 
   const loadDrinksForBar = async (summary: PublicBarSummary): Promise<DrinkItem[] | null> => {
     const cached = drinksCache[summary.id];
-    if (cached) return cached;
+    if (cached) return cached.drinks;
 
     setDrinksErrorId(null);
     setLoadingDrinksId(summary.id);
     try {
       const fetched = await getPublicBarDrinks(summary.id, summary.barName);
-      setDrinksCache((prev) => ({ ...prev, [summary.id]: fetched }));
+      const topDrinks = rankDrinks(fetched).slice(0, 3);
+      setDrinksCache((prev) => ({ ...prev, [summary.id]: { drinks: fetched, topDrinks } }));
       return fetched;
     } catch {
       setDrinksErrorId(summary.id);
@@ -280,13 +284,14 @@ export const DiscoverPanel: React.FC<DiscoverPanelProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {results.map((item) => {
             const isExpanded = expandedId === item.id;
-            const cachedDrinks = drinksCache[item.id];
+            const cachedEntry = drinksCache[item.id];
+            const cachedDrinks = cachedEntry?.drinks;
             const isLoadingDrinks = loadingDrinksId === item.id;
             const isAdopting = adoptingId === item.id;
             const hasLocalBar = existingBars.some((b) =>
               areBarNamesEquivalent(b, item.barName)
             );
-            const topDrinks = cachedDrinks ? rankDrinks(cachedDrinks).slice(0, 3) : [];
+            const topDrinks = cachedEntry?.topDrinks ?? [];
             const relativeTime = formatRelativeUpdatedAt(item.updatedAt);
 
             return (

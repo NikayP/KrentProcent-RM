@@ -1,9 +1,9 @@
-# KrentProcent (`1.0.0`)
+# KrentProcent (`1.1.0`)
 
 Bar drink value & alcohol efficiency calculator with AI menu scanning, optional cloud sync, and community bar discovery.
 
 ## Features
-- **Drinks & Leaderboard:** Calculate pure alcohol per euro (`ml/€`) and cost per standard drink across beers, wines, spirits, cocktails, and ciders — no account required.
+- **Drinks & Leaderboard:** Calculate pure alcohol per euro (`ml/€`) across beers, wines, spirits, cocktails, and ciders, and share dynamic Top 3 PNG cards — no account required.
 - **AI Menu Scanner:** Snap a photo with the camera, pick an image from your gallery, or upload a PDF menu (up to 3 MB), or paste menu text offline.
 - **My Bars, Discover & Account:** Compare venues side by side, optionally create an account to sync across devices, mark specific bars **Public** (with optional city), and browse/adopt bars shared by others in **Discover**.
 - **PWA & Offline Support:** Installable on Android and iOS home screens with offline menu calculations and local storage persistence.
@@ -28,6 +28,7 @@ For a fresh Supabase project, run [`supabase/schema.sql`](supabase/schema.sql) o
 For incremental upgrades from earlier versions, run the scripts in `supabase/migrations/` in order:
 1. `0002_change_username.sql`
 2. `0003_public_bars.sql`
+3. `0004_optimizations.sql`
 
 ## Verification
 
