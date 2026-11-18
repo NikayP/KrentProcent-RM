@@ -153,7 +153,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         </div>
         <h3 className="text-xl font-bold text-[#18181B] dark:text-[#FFFFFF] mb-2">No Drinks Added Yet</h3>
         <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto mb-6">
-          Use the form above to add a beer or drink for your current bar, or load our authentic pub
+          Use the form above to add a beer or drink for your current bar, or load our sample pub
           drinks preset to compare immediately.
         </p>
 
@@ -164,7 +164,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#F21B2D] hover:bg-[#D91424] text-white font-bold text-sm transition-all shadow-sm flex items-center justify-center gap-2"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Load Authentic Amsterdam Pub Drinks</span>
+            <span>Load Sample Pub Drinks</span>
           </button>
         </div>
       </div>
