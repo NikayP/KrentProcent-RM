@@ -19,9 +19,11 @@ import {
   Search,
 } from 'lucide-react';
 import { CategoryIcon, DRINK_CATEGORY_META } from './CategoryIcon';
-import type { ShareSortOption } from '../utils/shareCard';
-
-const loadShareCard = () => import('../utils/shareCard');
+import {
+  preloadShareCardAssets,
+  shareTopThreeImage,
+  type ShareSortOption,
+} from '../utils/shareCard';
 
 interface LeaderboardProps {
   drinks: DrinkItem[];
@@ -53,15 +55,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const [shareStatus, setShareStatus] = useState<'idle' | 'generating' | 'shared' | 'copied' | 'downloaded'>('idle');
 
   useEffect(() => {
-    const preload = () => {
-      void loadShareCard().then((m) => m.preloadShareCardAssets());
-    };
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const id = window.requestIdleCallback(preload, { timeout: 3000 });
-      return () => window.cancelIdleCallback(id);
-    }
-    const timer = setTimeout(preload, 1500);
-    return () => clearTimeout(timer);
+    preloadShareCardAssets();
   }, []);
 
   // Precompute other-bar counts per drink ID in one O(D) pass (avoids normalizing keys during render)
@@ -131,7 +125,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     if (topThree.length === 0 || shareStatus === 'generating') return;
     setShareStatus('generating');
     try {
-      const { shareTopThreeImage } = await loadShareCard();
       const outcome = await shareTopThreeImage({
         drinks: topThree,
         activeBar,
@@ -209,12 +202,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             <button
               type="button"
               onClick={handleShareTopThree}
-              onMouseEnter={() => {
-                void loadShareCard().then((m) => m.preloadShareCardAssets());
-              }}
-              onFocus={() => {
-                void loadShareCard().then((m) => m.preloadShareCardAssets());
-              }}
               disabled={shareStatus === 'generating'}
               title={`Share current Top ${topThree.length} as image`}
               className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#FFF2F3] dark:bg-[#121214] hover:bg-[#FF8A8E]/20 text-[#18181B] dark:text-zinc-200 border border-[#E4E4E7] dark:border-[#27272A] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 disabled:opacity-60"

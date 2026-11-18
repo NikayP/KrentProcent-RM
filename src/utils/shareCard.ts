@@ -28,13 +28,19 @@ const SORT_LABELS: Record<ShareSortOption, string> = {
 };
 
 let cachedLogoPromise: Promise<HTMLImageElement | null> | null = null;
+let cachedLogoImg: HTMLImageElement | null = null;
+let fontsReadyResolved = false;
 
 function loadLogoImage(): Promise<HTMLImageElement | null> {
   if (typeof window === 'undefined') return Promise.resolve(null);
+  if (cachedLogoImg) return Promise.resolve(cachedLogoImg);
   if (!cachedLogoPromise) {
     cachedLogoPromise = new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve(img);
+      img.onload = () => {
+        cachedLogoImg = img;
+        resolve(img);
+      };
       img.onerror = () => resolve(null);
       img.src = '/favicon.svg';
     });
@@ -42,9 +48,14 @@ function loadLogoImage(): Promise<HTMLImageElement | null> {
   return cachedLogoPromise;
 }
 
-/** Preloads the brand icon into memory so click-to-share runs within the user activation window. */
+/** Preloads the brand icon and fonts into memory so click-to-share runs within the mobile user activation window. */
 export function preloadShareCardAssets(): void {
   void loadLogoImage();
+  if (typeof document !== 'undefined' && 'fonts' in document && !fontsReadyResolved) {
+    void document.fonts.ready.then(() => {
+      fontsReadyResolved = true;
+    });
+  }
 }
 
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
@@ -213,10 +224,20 @@ export async function renderTopThreeShareCard(options: TopThreeCardOptions): Pro
     throw new Error('No drinks to render.');
   }
 
-  if (typeof document !== 'undefined' && 'fonts' in document) {
-    await document.fonts.ready;
+  if (typeof document !== 'undefined' && 'fonts' in document && !fontsReadyResolved) {
+    await Promise.race([
+      document.fonts.ready.then(() => {
+        fontsReadyResolved = true;
+      }),
+      new Promise<void>((resolve) => setTimeout(resolve, 200)),
+    ]);
   }
-  const logoImg = await loadLogoImage();
+  const logoImg =
+    cachedLogoImg ??
+    (await Promise.race([
+      loadLogoImage(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 200)),
+    ]));
 
   const width = 600;
   const dpr = 2;
