@@ -68,11 +68,10 @@ export const LoggedInView: React.FC<LoggedInViewProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-      {/* Left column: Identity, Stats & Security Controls */}
-      <div className="lg:col-span-7 space-y-5">
-        {/* Profile & Cloud Sync Card */}
-        <section className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      {/* Row 1 Left: Profile & Cloud Sync Card */}
+      <section className="lg:col-span-7 lg:order-1 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between gap-4">
+        <div className="space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-[#F21B2D]/15 text-[#F21B2D] border border-[#F21B2D]/30">
@@ -140,25 +139,27 @@ export const LoggedInView: React.FC<LoggedInViewProps> = ({
               </div>
             </button>
           </div>
+        </div>
 
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            {syncStatus === 'offline'
-              ? 'Changes are saved on this device and will sync automatically when you are back online.'
-              : 'Your bars, drinks, and scanned menus are backed up automatically across devices.'}
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {syncStatus === 'offline'
+            ? 'Changes are saved on this device and will sync automatically when you are back online.'
+            : 'Your bars, drinks, and scanned menus are backed up automatically across devices.'}
+        </p>
+      </section>
+
+      {/* Row 2 Left (Desktop) / 2nd (Mobile): Profile & Security Settings Card */}
+      <section className="lg:col-span-7 lg:order-3 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between gap-4">
+        <div>
+          <h4 className="text-sm font-bold text-[#18181B] dark:text-white">
+            Profile &amp; Security
+          </h4>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Update how you appear on shared bars or change your password.
           </p>
-        </section>
+        </div>
 
-        {/* Profile & Security Settings Card */}
-        <section className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
-          <div>
-            <h4 className="text-sm font-bold text-[#18181B] dark:text-white">
-              Profile &amp; Security
-            </h4>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Update how you appear on shared bars or change your password.
-            </p>
-          </div>
-
+        <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-2.5">
             <button
               type="button"
@@ -224,82 +225,87 @@ export const LoggedInView: React.FC<LoggedInViewProps> = ({
               }}
             />
           )}
-        </section>
-      </div>
+        </div>
+      </section>
 
-      {/* Right column: Privacy, Shortcuts & Session */}
-      <div className="lg:col-span-5 space-y-5">
-        <section className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-3.5">
+      {/* Row 1 Right (Desktop) / 3rd (Mobile): Sharing & Privacy */}
+      <section className="lg:col-span-5 lg:order-2 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between gap-3.5">
+        <div className="space-y-3.5">
           <h4 className="text-sm font-bold text-[#18181B] dark:text-white">
             Sharing &amp; Privacy
           </h4>
 
           <PrivacyNote />
+        </div>
 
-          {(onGoToMyBars || onGoToDiscover) && (
-            <div className="flex flex-col gap-2 pt-1">
-              {onGoToMyBars && (
-                <button
-                  type="button"
-                  onClick={onGoToMyBars}
-                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-[#18181B] dark:text-zinc-200 bg-[#FAFAFA] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors flex items-center justify-between cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    <Store className="w-3.5 h-3.5 text-[#F21B2D]" />
-                    Manage public bars in My Bars
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
-                </button>
-              )}
-              {onGoToDiscover && (
-                <button
-                  type="button"
-                  onClick={onGoToDiscover}
-                  className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-[#18181B] dark:text-zinc-200 bg-[#FAFAFA] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors flex items-center justify-between cursor-pointer"
-                >
-                  <span className="flex items-center gap-2">
-                    <Compass className="w-3.5 h-3.5 text-[#F21B2D]" />
-                    Browse Community Bars
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
-                </button>
-              )}
+        {(onGoToMyBars || onGoToDiscover) && (
+          <div className="flex flex-col gap-2 pt-1">
+            {onGoToMyBars && (
+              <button
+                type="button"
+                onClick={onGoToMyBars}
+                className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-[#18181B] dark:text-zinc-200 bg-[#FAFAFA] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors flex items-center justify-between cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Store className="w-3.5 h-3.5 text-[#F21B2D]" />
+                  Manage public bars in My Bars
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
+              </button>
+            )}
+            {onGoToDiscover && (
+              <button
+                type="button"
+                onClick={onGoToDiscover}
+                className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-[#18181B] dark:text-zinc-200 bg-[#FAFAFA] dark:bg-[#121214] hover:bg-[#FFF2F3] dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors flex items-center justify-between cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <Compass className="w-3.5 h-3.5 text-[#F21B2D]" />
+                  Browse Community Bars
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Row 2 Right (Desktop) / 4th (Mobile): Session & Danger Zone */}
+      <section
+        className={`lg:col-span-5 lg:order-4 bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between gap-3 ${
+          activeEditor !== 'none' ? 'lg:self-start' : ''
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onLogout}
+          disabled={isSubmitting}
+          className="w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold text-[#18181B] dark:text-zinc-200 bg-[#FAFAFA] dark:bg-[#121214] hover:bg-zinc-100 dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <LogOut className="w-4 h-4" />
+          <span>Log out</span>
+        </button>
+
+        <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+              Delete account
             </div>
-          )}
-        </section>
-
-        <section className="bg-[#FFFFFF] dark:bg-[#18181B] border border-[#E4E4E7] dark:border-[#27272A] rounded-2xl p-5 sm:p-6 shadow-sm space-y-3">
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+              Removes cloud data; local drinks remain on this device.
+            </p>
+          </div>
           <button
             type="button"
-            onClick={onLogout}
+            onClick={onRequestDeleteAccount}
             disabled={isSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold text-[#18181B] dark:text-zinc-200 bg-[#FAFAFA] dark:bg-[#121214] hover:bg-zinc-100 dark:hover:bg-[#27272A] border border-[#E4E4E7] dark:border-[#27272A] transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="shrink-0 py-1.5 px-3 rounded-xl text-xs font-semibold text-[#D91424] dark:text-[#FF8A8E] hover:bg-[#F21B2D]/10 border border-[#F21B2D]/30 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <LogOut className="w-4 h-4" />
-            <span>Log out</span>
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete</span>
           </button>
-
-          <div className="pt-3 border-t border-[#E4E4E7] dark:border-[#27272A] flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Delete account
-              </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Removes cloud data; local drinks remain on this device.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onRequestDeleteAccount}
-              disabled={isSubmitting}
-              className="shrink-0 py-1.5 px-3 rounded-xl text-xs font-semibold text-[#D91424] dark:text-[#FF8A8E] hover:bg-[#F21B2D]/10 border border-[#F21B2D]/30 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Delete</span>
-            </button>
-          </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 };
